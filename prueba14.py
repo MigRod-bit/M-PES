@@ -1,0 +1,596 @@
+import tkinter as tk
+import copy
+from tkinter import ttk, filedialog
+import customtkinter
+from tkinterweb import HtmlFrame  # To embed HTML in tkinter
+from tkhtmlview import HTMLLabel  # Import HTMLLabel from tkhtmlview
+import csv
+#import plotly.graph_objects as go
+import plotly.io as pio
+from plotly.graph_objs.layout import YAxis, XAxis, Margin
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import matplotlib.pyplot as plt
+
+
+
+# Window Params
+W = 1900
+H = 960
+
+# DEBUG FUNCTIONS
+def combobox_callback(choice):
+        print("combobox dropdown clicked:", choice)
+
+
+
+class App(customtkinter.CTk):
+    def __init__(self):
+        super().__init__()
+
+        # DEFINE PARAMETERES:
+        self.ngraph = 0
+        self.nmechs = 1
+        self.energylist = [0, 0]
+        self.refs = [0, 0]
+        self.S = [0, 0]
+        self.RCoord = [0, 0]
+        self.colorlist = []
+        self.mechs = [0, 0]
+        self.mechstypes = {}
+        self.Units = [0, 0] # 0 for eV, 1 for kcal/mol, 2 for kJ/mol
+        self.Titles = [0, 0]
+        self.linedict = {}
+        self.bardict = {}
+        self.normenlist = [] #for normalised energies and plotting them
+
+        #Frames
+        self.LeftFrame = customtkinter.CTkFrame(self, width=W/3, height=H, border_color='red')
+        self.LeftFrame.grid(row=0, column=0, padx=20, pady=20, sticky="ns")
+        self.RightFrame = customtkinter.CTkFrame(self, width=2*W/3, height=H, border_color='red')
+        self.RightFrame.grid(row=0, column=1, padx=20, pady=20, sticky="ns")
+
+        self.title("m-PES")
+        self.geometry('{}x{}'.format(W, H))
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_columnconfigure(1, weight=10)
+        self.grid_columnconfigure(2, weight=1)
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_rowconfigure(1, weight=3)
+        self.grid_rowconfigure(2, weight=1)
+        self.load_button = customtkinter.CTkButton(self.LeftFrame, text="Load from CSV", command=lambda:self.readinput(self.ngraph, self.energylist, self.refs, self.RCoord, self.Titles, self.mechs))
+        self.plot_button = customtkinter.CTkButton(self.LeftFrame, text="Plot PES", command=lambda:self.pltPES(self.graph_frame, self.ngraph, self.RCoord, self.Titles, self.energylist, self.mechs, self.Units))
+
+        self.load_button.grid(row=0, column=0,  padx=20, pady=20, sticky="w")
+        self.plot_button.grid(row=3, column=0,  padx=20, pady=20, sticky="w")
+
+        self.graph_frame = customtkinter.CTkFrame(self.RightFrame, width=W/3, height=H, border_color='blue')
+        self.graph_frame.grid(row=0, column=1, padx=10, pady=10)
+
+
+        # Create Canvas
+        #canvas1 = tk.Canvas(self, )
+
+    def readinput(self, ngraph, energylist, refs, RCoord, Titles, mechs): # Read info from CSV
+        #global energylist, refs, RCoord, Titles
+        energydict = {}
+        ref = []
+
+        file_path = filedialog.askopenfilename(filetypes=[("CSV files", "*.csv")])
+        if file_path:
+            try:
+                with open(file_path, 'r') as file:
+                    reader = csv.reader(file)
+                    T = next(reader)[0]
+                    print('TITLE = ', T)
+                    headers = next(reader)  
+                    line = next(reader)  # Read gas reaction coords
+                    for i in range(len(line)):
+                        RC = [coord for coord in line[1:]]
+                    U = line[0]
+                    headers = next(reader) 
+                    nPES = next(reader)  # Number of PES diagrams
+                    nPES = int(nPES[0])
+                    print(nPES)
+                    for i in range(nPES):
+                        energy = next(reader)
+                        fenergy = [float(num) for num in energy[1:]]
+                        energydict[energy[0]] = fenergy
+                        ref.append(energy[0])
+                        print(i)
+                    refs[ngraph] = ref
+                    Titles[ngraph] = T
+                    RCoord[ngraph] = RC
+                    energylist[ngraph] = energydict
+                    self.Units[ngraph] = U.strip()
+                    self.RCoord[ngraph] = RC
+                    #create_ref_buttons(ngraph)
+                    self.createenergysets(ngraph, Titles[ngraph], refs[ngraph], mechs, energylist, self.Units, self.RCoord)
+
+
+            except StopIteration as e:
+                print(f"Reached the end of the CSV unexpectedly: {e}")
+            except ValueError as e:
+                print(f"Value error when converting data types: {e}")
+            except Exception as e:
+                print(f"Error loading file: {e}")
+
+        print('Titles', Titles)
+        print('Energylist', energylist)
+        print('Refs', refs)
+        print('RCoord', RCoord)
+        print('Units :', self.Units)
+
+    def normalize(self, ngraph, energylist, sel_ref):
+        nlist = copy.deepcopy(energylist)
+        if sel_ref.get() == 'no ref':
+            pass
+        elif sel_ref.get() == 'all zero':
+            print('BEFORE el:', nlist)
+            for key in nlist[ngraph]:
+                nlist[ngraph][key] = [energy - nlist[ngraph][key][0] for energy in nlist[ngraph][key]]
+            print('AFTER el:', nlist)
+        else:
+            print('BEFORE el:', nlist)
+            S = nlist[ngraph][sel_ref.get()][0]
+            print('S=', S)
+            for key in nlist[ngraph]:
+                nlist[ngraph][key] = [energy - S for energy in nlist[ngraph][key]]
+            print('AFTER el:', nlist)
+        return nlist
+
+    def conversion(self, ngraph, energylist, uts, sel_conv):
+        nlist = copy.deepcopy(energylist)
+        u1 = Units_list.index(uts[ngraph])
+        u2 = Units_list.index(sel_conv.get())
+        print('nlist', nlist)
+        print('u1 and u2', u1, u2)
+        if u1 == u2:
+            pass
+        else:
+            for key in nlist[ngraph]:
+                nlist[ngraph][key] = [energy*Conv_mat[u1][u2] for energy in nlist[ngraph][key]]
+        return nlist
+
+
+
+    def createenergysets(self, ngraph, title, refs, mechs, energylist, units, RCoord):
+        print('hoa')
+        self.energysets = EnergySettings(self.LeftFrame, ngraph, title, refs, mechs, energylist, units, RCoord)
+        print('hola')
+        self.energysets.grid(row=1, column=0, padx=10, pady=(10, 0), sticky="nsw", columnspan=2)
+        #print(ngraph)
+
+    def pltPES(self, frame, ngraph, RCoord, Titles, energylist, mechs, Us):
+        self.normenlist = []
+        self.convlist = []
+        self.mechs = mechs
+        reaction_coordinates = [(i+1)*2 for i in range(len(RCoord[0]))]
+        for key in mechs[ngraph]:
+            print(key, 'line =', self.mechs[ngraph][key].linestyle)
+            print(key, 'color =', self.mechs[ngraph][key].color_name)
+            print(key, 'SP =', self.mechs[ngraph][key].SPdict)
+
+        for key in self.energylist[ngraph]:
+            print('bartype', self.mechs[ngraph][key].barstyle)
+            print('line', self.mechs[ngraph][key].linestyle)
+            print('color', self.mechs[ngraph][key].color_name)
+            #print('barstyle :', str(mechs[ngraph][energylist[ngraph][key]].bartype))
+        # Normalization:
+
+        if hasattr(self.energysets, 'sel_norm') and self.energysets.sel_norm.get() == 'on':
+            if hasattr(self.energysets, 'refsubbox') and hasattr(self.energysets.refsubbox, 'sel_ref'):
+                print('NORM?', self.energysets.sel_norm.get())
+                print('SEL REF', self.energysets.refsubbox.sel_ref.get())
+                normenlist = self.normalize(ngraph, energylist, self.energysets.refsubbox.sel_ref) # Hay que averiguar bien como normalizar esto.
+                self.normenlist = normenlist
+
+        # Unit Conversion:
+        if hasattr(self.energysets, 'sel_conv'):
+            print('Actual Units: ', Us[ngraph])
+            print('Obj Units:', self.energysets.sel_conv.get())
+            if self.normenlist == []:
+                convlist = self.conversion(ngraph, self.energylist, Us, self.energysets.sel_conv)
+                self.convlist = convlist
+            else:
+                convlist = self.conversion(ngraph, self.normenlist, Us, self.energysets.sel_conv)
+                self.convlist = convlist
+
+
+        fig, ax = plt.subplots(figsize=(8, 6))
+        ax.set_title(Titles[0])
+        ax.set_xlabel('Reaction Coordinate')
+        ax.set_ylabel(f'Relative Free Energy ({Us[0]})')
+
+        # Plot the energetic structures:
+        for key in self.convlist[ngraph]:
+            i = 0
+            for i, value in enumerate(self.convlist[ngraph][key]):
+                #plot the horizontal bars
+                #if list(self.mechs[ngraph][key].SPdict.keys())[i] == RCoord[self.ngraph][i]:
+                #    print('The Coord is ', list(self.mechs[ngraph][key].SPdict.keys())[i], ' or ', RCoord[self.ngraph][i])
+                #print('X', self.mechs[ngraph][key].SPdict[RCoord[self.ngraph][i]])
+                if self.mechs[ngraph][key].SPdict[RCoord[self.ngraph][i]] == 'False':
+                    ax.hlines(y=value, xmin=reaction_coordinates[i]-0.5, xmax=reaction_coordinates[i]+0.5, color=str(self.mechs[ngraph][key].color_code), linewidth=2, linestyles=self.mechs[ngraph][key].barstyle)
+                elif self.mechs[ngraph][key].SPdict[RCoord[self.ngraph][i]] == 'True':
+                    ax.plot(reaction_coordinates[i], value, color=str(self.mechs[ngraph][key].color_code), marker='o')
+
+                if i < len(self.convlist[ngraph][key]) - 1:
+                    #plot lines connecting horizontal lines
+                    if self.mechs[ngraph][key].SPdict[RCoord[self.ngraph][i]] == 'False' and self.mechs[ngraph][key].SPdict[RCoord[self.ngraph][i+1]] == 'False':
+                        x_values = [reaction_coordinates[i] + 0.5, reaction_coordinates[i+1] - 0.5]
+                        y_values = [self.convlist[ngraph][key][i], self.convlist[ngraph][key][i+1]]
+                        ax.plot(x_values, y_values, color=str(self.mechs[ngraph][key].color_code), linewidth=0.5, linestyle=self.mechs[ngraph][key].linestyle)
+                    elif self.mechs[ngraph][key].SPdict[RCoord[self.ngraph][i]] == 'True' and self.mechs[ngraph][key].SPdict[RCoord[self.ngraph][i+1]] == 'False':
+                        x_values = [reaction_coordinates[i], reaction_coordinates[i+1] - 0.5]
+                        y_values = [self.convlist[ngraph][key][i], self.convlist[ngraph][key][i+1]]
+                        ax.plot(x_values, y_values, color=str(self.mechs[ngraph][key].color_code), linewidth=0.5, linestyle=self.mechs[ngraph][key].linestyle)
+                    elif self.mechs[ngraph][key].SPdict[RCoord[self.ngraph][i]] == 'False' and self.mechs[ngraph][key].SPdict[RCoord[self.ngraph][i+1]] == 'True':
+                        x_values = [reaction_coordinates[i] + 0.5, reaction_coordinates[i+1]]
+                        y_values = [self.convlist[ngraph][key][i], self.convlist[ngraph][key][i+1]]
+                        ax.plot(x_values, y_values, color=str(self.mechs[ngraph][key].color_code), linewidth=0.5, linestyle=self.mechs[ngraph][key].linestyle)
+                    elif self.mechs[ngraph][key].SPdict[RCoord[self.ngraph][i]] == 'True' and self.mechs[ngraph][key].SPdict[RCoord[self.ngraph][i+1]] == 'True':
+                        x_values = [reaction_coordinates[i], reaction_coordinates[i+1]]
+                        y_values = [self.convlist[ngraph][key][i], self.convlist[ngraph][key][i+1]]
+                        ax.plot(x_values, y_values, color=str(self.mechs[ngraph][key].color_code), linewidth=0.5, linestyle=self.mechs[ngraph][key].linestyle)
+                        
+                    #print(self.convlist[ngraph][key][i])
+                i += 1
+
+        ax.legend()
+
+        # Embed Matplotlib figure into the tkinter frame
+        for widget in frame.winfo_children():
+            widget.destroy()  # Clear the frame
+
+        # Create a canvas for the Matplotlib plot
+        canvas = FigureCanvasTkAgg(fig, master=frame)
+        canvas.draw()
+        canvas.get_tk_widget().grid(row=0, column=0, sticky="nsew")
+
+        # Set the frame to expand to fit the content
+        frame.grid_rowconfigure(0, weight=1)
+        frame.grid_columnconfigure(0, weight=1)
+
+        plt.close(fig)
+
+
+
+class EnergySettings(customtkinter.CTkFrame):
+    def __init__(self, master, ngraph, title, refs, mechs, energylist, Units, RC):
+        super().__init__(master, width=W/3, height=3*H/4, border_color='green', border_width=4)
+        self.grid_propagate(False)
+        self.Title = title
+        self.units = Units
+        self.refs = refs
+        self.ngraph = ngraph
+        self.mechs = mechs
+        self.RC = RC
+        #self.m = mechs[ngraph]
+        self.energylist = energylist
+
+        self.refsubbox = None
+        self.graphicalsets = None
+        #self.canvGS = None
+        #self.scrollGS = None
+        self.SPsettings = None
+
+
+        #DEFAULT SELECTIONS
+        self.sel_ref = 'no ref'
+
+
+
+        self.grid_columnconfigure(0, weight=1)
+        self.title = customtkinter.CTkLabel(self, text=f'Energy settings for {self.Title}', font=('Helvetica', 18, 'bold'), fg_color="gray30", corner_radius=6)
+        self.title.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="ew")
+
+        #DEFAULT SETTINGS
+        self.values = []
+        print(self.refs)
+        for i in range(len(self.RC[self.ngraph])):
+            print(i)
+            print(self.values)
+            self.values.append('False')
+
+
+        if self.mechs[ngraph] == 0:
+            m = {}
+            j = 0
+            for ref in self.refs:
+                m[ref] = Mech('no ref', list(colors_html.keys())[j], 'dashed', 'solid', dict(zip(self.RC[self.ngraph], self.values)))
+                j += 1
+        print('jelo', m[self.refs[0]].SPdict)
+        self.mechs[self.ngraph] = m
+
+
+# Conversion of units
+        self.conv_label = customtkinter.CTkLabel(self, text='Unit conversion:')
+        self.conv_label.grid(row=1, column=1, padx=10, pady=(10, 0), sticky="w")
+        self.sel_conv = tk.StringVar(value=Units[ngraph])
+        self.conversion = customtkinter.CTkComboBox(self, values=['eV', 'kcal/mol', 'kJ/mol'], variable=self.sel_conv)
+        self.conversion.grid(row=2, column=1, padx=10, pady=(10, 0), sticky="w")
+# Normalization
+        self.sel_norm = tk.StringVar(value='off')
+        self.normcheck = customtkinter.CTkCheckBox(self, text='Normalize', variable=self.sel_norm, onvalue='on', offvalue='off', command=lambda: self.createrefsubbox(self.sel_norm, self.refs)) #Comprobar si está pulsado cuando se genere el gráfico
+        #print('self.sel_norm.get()', self.sel_norm.get())
+        self.normcheck.grid(row=3, column=0, padx=10, pady=(10, 0), sticky="w")
+# Create Graphical Settings Window
+        self.graphsets = customtkinter.CTkButton(self, text="Graphical Settings", command=lambda:self.opengraphsets(self.Title, self.ngraph, self.refs, self.mechs, self.energylist))
+        self.graphsets.grid(row=3, column=1, padx=10, pady=(10, 0), sticky="w")
+
+    def opengraphsets(self, title, ngraph, refs, mechs, energylist):
+        if not self.graphicalsets:
+            print('Creating Graphical Settings')
+            # Create Canvas
+            self.newWin = customtkinter.CTkToplevel(self, fg_color="black")
+            self.newWin.title('Graphical Settings')
+            #self.newWin.resizable()
+            #self.canvGS.grid(row=0, column=0, sticky="nsew", columnspan=1)
+            ## Horizontal Scrollbar
+            #self.scrollGSX = customtkinter.CTkScrollbar(self, orientation='horizontal', command=self.canvGS.xview)
+            #self.scrollGSX.grid(row=1, column=0, sticky='ew')
+            ## Vertical Scrollbar
+            #self.scrollGSY = customtkinter.CTkScrollbar(self, orientation='vertical', command=self.canvGS.yview)
+            #self.scrollGSY.grid(row=0, column=1, sticky='ns')
+#
+            #self.canvGS.configure(xscrollcommand=self.scrollGSX.set)
+            #self.canvGS.configure(yscrollcommand=self.scrollGSY.set)
+
+            #self.graphicalsets.update_idletasks()
+            self.graphicalsets = GraphicalSettings(self.newWin, title, ngraph, refs, mechs, energylist, self.RC)
+            self.graphicalsets.grid( padx=10, pady=(10, 0))
+            #self.canvGS.create_window((0, 0), window=self.graphicalsets, anchor="nw")
+            #self.canvGS.config(scrollregion=self.canvGS.bbox("all"))
+        else:
+            if self.graphicalsets:
+                self.graphicalsets.destroy()
+                self.graphicalsets = None
+            if self.newWin:
+                self.newWin.destroy()
+                self.newWin = None
+            #if self.scrollGS:
+            #    self.scrollGS.destroy()
+            #    self.scrollGS = None
+#
+
+    def createrefsubbox(self, sel_norm, refs):
+        if sel_norm.get() == 'on':
+            if not self.refsubbox:
+                print('Creating RefsSubBox')
+                self.refsubbox = RefSubBox(self, refs)
+                self.refsubbox.grid(row=2, column=0, padx=10, pady=(10, 0), sticky="nsw")
+        else:
+            if self.refsubbox:
+                self.refsubbox.destroy()
+                self.refsubbox = None
+    
+class RefSubBox(customtkinter.CTkFrame):
+    def __init__(self, master, refs):
+        super().__init__(master)
+        # Setting Refference
+        self.refbox = ['no ref', 'all zero'] + refs
+        #print('REFBOX:', refbox)
+        self.reflabel = customtkinter.CTkLabel(self, text='PES reference:')
+        self.reflabel.grid(row=1, column=0, padx=10, pady=(10, 0), sticky="w")
+        #Selection
+        self.sel_ref = tk.StringVar(self)
+        self.sel_ref.set(self.refbox[0])
+        self.refcombox = customtkinter.CTkOptionMenu(self, variable=self.sel_ref, values=self.refbox)
+        self.refcombox.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="w")
+        #self.debug = customtkinter.CTkButton(self, text='printref', command=lambda:combobox_callback(self.sel_ref.get()))
+        #self.debug.grid(row=0, column=1, padx=10, pady=(10, 0), sticky="w")
+        
+
+
+class GraphicalSettings(customtkinter.CTkFrame):
+    def __init__(self, master, title, ngraph, refs, mechs, energylist, RC):
+        super().__init__(master)
+        #self.grid_propagate(False)
+        self.ngraph = ngraph
+        self.RC = RC
+        self.title = title
+        self.refs = refs # refs in a list
+        self.mechs = mechs # list containing a dictionary with key=refs and values = Mech types containing graphical info. 
+        self.m = mechs[ngraph]
+        self.colordict = {}
+        self.linedict = {}
+        self.bardict = {}
+        self.SPsubboxes = {}  # Dictionary to store SPsubboxes for each key
+        print('MECHS', self.m)
+        print('REFS', refs)
+        # DEFAULT SETTINGS
+        print('DEFAULTSETTING:', self.mechs[ngraph])
+        #CREATE SP grid:
+        self.SPframe = customtkinter.CTkFrame(self)
+        self.SPframe.grid(row=3+len(energylist[ngraph]) ,column=0, padx=10, pady=(10, 0), sticky='w')
+
+
+        self.SP_vars = {}
+        self.title = customtkinter.CTkLabel(self, text=f'Graphical Settings for {self.title}')
+        self.title.grid(row=0 ,column=0, padx=10, pady=(10, 0), sticky='we', columnspan=3)
+        self.subtitles = [f'Mechanism {title}', 'Color', 'Linestyle', 'Barstyle', 'Single Points']
+        for i in range(len(self.subtitles)):
+            stit = customtkinter.CTkLabel(self, text=self.subtitles[i])
+            stit.grid(row=1 ,column=i, padx=10, pady=(10, 0), sticky='w')
+
+        for i in range(len(refs[ngraph])):
+            print('refs[ngraph]', refs[ngraph])
+            self.colordict[self.refs[i]] = 0
+            print(self.refs[i])
+
+        for index, (key, en) in enumerate(energylist[ngraph].items()):
+            label = customtkinter.CTkLabel(self, text=key)
+            label.grid(row = index+2, column = 0, padx=10, pady=5)
+            # Colors
+            color_var = tk.StringVar(self)
+            color_var.set(self.m[key].color_name)
+            self.colordict[key] = color_var
+            color_menu = customtkinter.CTkOptionMenu(self,variable=color_var, values=list(colors_html.keys()), command=combobox_callback(color_var))
+            color_menu.grid(row = index+2, column = 1, padx=10, pady=5)
+            # Linestyle
+            line_var = tk.StringVar(self)
+            line_var.set(self.m[key].linestyle)
+            self.linedict[key] = line_var
+            line_menu =  customtkinter.CTkOptionMenu(self,variable=line_var, values=linestyles)
+            line_menu.grid(row = index+2, column = 2, padx=10, pady=5)
+            #mechs[ngraph][key].linetype = line_var.get()
+            # Barstyle
+            bar_var = tk.StringVar(self)
+            bar_var.set(self.m[key].barstyle)
+            self.bardict[key] = bar_var
+            bar_menu =  customtkinter.CTkOptionMenu(self,variable=bar_var, values=linestyles)
+            bar_menu.grid(row = index+2, column = 3, padx=10, pady=5)
+            # SP option
+            self.SP_vars[key] = tk.StringVar(value='off')
+            SP_check = customtkinter.CTkCheckBox(self, text='',variable=self.SP_vars[key],  onvalue='on', offvalue='off', command=lambda k=key, i=index: self.createSPboxes(self.ngraph, self.SP_vars[k], energylist, k, i))
+            SP_check.grid(row = index+2, column = 4, padx=10, pady=5, sticky='nsew')
+
+        self.save_button = customtkinter.CTkButton(self, text='Save Settings', command=lambda:self.savesetts(ngraph, self.colordict, self.linedict, self.bardict, self.mechs, self.SPsubboxes))
+        self.save_button.grid(row = len(refs[ngraph])+2, column = 3, padx=10, pady=5)
+        
+    def createSPboxes(self, ngraph, sel_SP, enlist, key, index):
+            print('enteredSPboxes')
+            print(sel_SP.get())
+            if sel_SP.get() == 'on':
+                print(f'Creating SPsubbox for {key}')
+                if key not in self.SPsubboxes:
+                    spbox = SPsubbox(ngraph, self.SPframe, enlist, key, index, self.RC)
+                    spbox.grid(row=len(enlist[ngraph]), column=index, padx=10, pady=5)  
+                    print('Creating SPsubbox')
+                    self.SPsubboxes[key] = spbox
+                else:
+                    print('SPsubbox already exists')
+            else:
+                print(f'Checkbox for {key} is OFF')
+                if key in self.SPsubboxes:
+                    print(f'Destroying Subbox {key}')
+                    self.SPsubboxes[key].destroy()
+                    self.SPsubboxes[key].title.destroy()
+                    del self.SPsubboxes[key]
+
+
+
+    def savesetts(self, ngraph, sel_color, sel_line, sel_bar, mechs, SPdict):
+        print(f"Saving settings for ngraph: {ngraph}")
+        print('SPsubbox', SPdict )
+        for key in SPdict:
+            newdic = {}
+            #for c in SPdict[key]:
+            if len(self.SPsubboxes[key].RCspdict.keys()) != len(self.RC[self.ngraph]):
+                print(f'Length of SPdict ({len(self.SPsubboxes[key].RCspdict.keys())}) doesnt match length of RCoord ({len(self.RC[self.ngraph])})')
+            for c in self.RC[self.ngraph]:
+                newdic[c] = SPdict[key].RCspdict[c].get()
+                print('newdic', newdic)
+            mechs[ngraph][key].SPdict = newdic
+            print(f'Updated {key}: ref = {newdic}')
+
+
+        for key in sel_color.keys():
+            color_name = sel_color[key].get()
+            if key in mechs[ngraph]:
+                mechs[ngraph][key].color_name = color_name
+                mechs[ngraph][key].color_code = colors_html.get(color_name, None)
+                print(f'Updated {key}: color_name = {color_name}, color_code = {colors_html.get(color_name, None)}')
+            else:
+                print(f'Key {key} not found in mechs[{ngraph}]')
+
+        for key in sel_line.keys():
+            if key in mechs[ngraph]:
+                mechs[ngraph][key].linestyle = sel_line[key].get()
+                print(f'Updated {key}: linestyle = {sel_line[key].get()}')
+            else:
+                print(f'Key {key} not found in mechs[{ngraph}]')
+
+        for key in sel_bar.keys():
+            if key in mechs[ngraph]:
+                mechs[ngraph][key].barstyle = sel_bar[key].get()
+                print(f'Updated {key}: barstyle = {sel_bar[key].get()}')
+            else:
+                print(f'Key {key} not found in mechs[{ngraph}]')
+
+
+
+
+        #print(refs[0])
+        #print('Color = ', mechs[ngraph][refs[0][0]].color_name)
+
+class SPsubbox(customtkinter.CTkFrame):
+    def __init__(self, ngraph, master, enlist, ref, index, RC):
+        super().__init__(master)
+        self.RC = RC
+        self.ref = ref
+        self.RCspdict = {}
+        self.title = customtkinter.CTkLabel(master, text=f'SP Settings for {self.ref}')
+        self.title.grid(row=0, column=index, padx=10, pady=(10, 0), sticky='we')
+        # Create checkboxes for SP
+        i = 0
+        for c in RC[ngraph]:
+            self.RCspdict[c] = tk.StringVar(value='False')
+            ckSP = customtkinter.CTkCheckBox(self, text=c,variable=self.RCspdict[c], onvalue='True', offvalue='False')
+            ckSP.grid(row = i, column=index, padx=10, pady=(10, 0), sticky='we')
+            i += 1
+
+
+
+class Mech:
+    def __init__(self, S, color, linestyle, barstyle, SPdict):
+        self.SPdict = SPdict
+        if color in colors_html:
+            self.color_name = color
+            self.color_code = colors_html[color]
+            self.linestyle = linestyle
+            self.barstyle = barstyle
+            self.ref = S
+        else:
+            raise ValueError(f"Color '{color}' is not in the list of available colors.")
+#        
+# Global parameters:
+
+eVtokcal = 23.060541945329334
+eVtokJ = 96.48530749925794
+kcaltokJ = 4.184
+
+# UNITS
+Units_list = ['eV', 'kcal/mol', 'kJ/mol']
+
+Conv_mat = [
+    [1, eVtokcal, eVtokJ],
+    [1/eVtokcal, 1, kcaltokJ],
+    [1/eVtokJ, 1/kcaltokJ, 1]
+]
+
+# COLORS
+colors_html = {
+    'Red': '#FF0000',
+    'Green': '#008000',
+    'Blue': '#0000FF',
+    'Yellow': '#FFFF00',
+    'Orange': '#FFA500',
+    'Purple': '#800080',
+    'Pink': '#FFC0CB',
+    'Brown': '#A52A2A',
+    'Black': '#000000',
+    'White': '#FFFFFF',
+    'Gray': '#808080',
+    'Cyan': '#00FFFF',
+    'Magenta': '#FF00FF',
+    'Lime': '#00FF00',
+    'Olive': '#808000',
+    'Navy': '#000080',
+    'Teal': '#008080',
+    'Maroon': '#800000',
+    'Silver': '#C0C0C0',
+    'Gold': '#FFD700'
+}
+
+# LINEstyleS
+linestyles = ['solid', 'dotted', 'dashed', 'dashdot']
+
+
+root = App()
+customtkinter.set_appearance_mode("dark")
+
+    
+
+# Run the main event loop
+root.mainloop()
