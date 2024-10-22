@@ -2,15 +2,10 @@ import tkinter as tk
 import copy
 from tkinter import ttk, filedialog
 import customtkinter
-from tkinterweb import HtmlFrame  # To embed HTML in tkinter
-from tkhtmlview import HTMLLabel  # Import HTMLLabel from tkhtmlview
 import csv
-#import plotly.graph_objects as go
-import plotly.io as pio
 from plotly.graph_objs.layout import YAxis, XAxis, Margin
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.pyplot as plt
-
 
 
 # Window Params
@@ -20,8 +15,6 @@ H = 960
 # DEBUG FUNCTIONS
 def combobox_callback(choice):
         print("combobox dropdown clicked:", choice)
-
-
 
 class App(customtkinter.CTk):
     def __init__(self):
@@ -59,16 +52,10 @@ class App(customtkinter.CTk):
         self.grid_rowconfigure(2, weight=1)
         self.load_button = customtkinter.CTkButton(self.LeftFrame, text="Load from CSV", command=lambda:self.readinput(self.ngraph, self.energylist, self.refs, self.RCoord, self.Titles, self.mechs))
         self.plot_button = customtkinter.CTkButton(self.LeftFrame, text="Plot PES", command=lambda:self.pltPES(self.graph_frame, self.ngraph, self.RCoord, self.Titles, self.energylist, self.mechs, self.Units))
-
         self.load_button.grid(row=0, column=0,  padx=20, pady=20, sticky="w")
         self.plot_button.grid(row=3, column=0,  padx=20, pady=20, sticky="w")
-
         self.graph_frame = customtkinter.CTkFrame(self.RightFrame, width=W/3, height=H, border_color='blue')
         self.graph_frame.grid(row=0, column=1, padx=10, pady=10)
-
-
-        # Create Canvas
-        #canvas1 = tk.Canvas(self, )
 
     def readinput(self, ngraph, energylist, refs, RCoord, Titles, mechs): # Read info from CSV
         #global energylist, refs, RCoord, Titles
@@ -103,9 +90,7 @@ class App(customtkinter.CTk):
                     energylist[ngraph] = energydict
                     self.Units[ngraph] = U.strip()
                     self.RCoord[ngraph] = RC
-                    #create_ref_buttons(ngraph)
                     self.createenergysets(ngraph, Titles[ngraph], refs[ngraph], mechs, energylist, self.Units, self.RCoord)
-
 
             except StopIteration as e:
                 print(f"Reached the end of the CSV unexpectedly: {e}")
@@ -151,14 +136,19 @@ class App(customtkinter.CTk):
                 nlist[ngraph][key] = [energy*Conv_mat[u1][u2] for energy in nlist[ngraph][key]]
         return nlist
 
-
-
     def createenergysets(self, ngraph, title, refs, mechs, energylist, units, RCoord):
         print('hoa')
         self.energysets = EnergySettings(self.LeftFrame, ngraph, title, refs, mechs, energylist, units, RCoord)
         print('hola')
         self.energysets.grid(row=1, column=0, padx=10, pady=(10, 0), sticky="nsw", columnspan=2)
         #print(ngraph)
+
+    def save_PES_png(self, fig):
+        """Function to save the current figure as a PNG file."""
+        file_path = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("PNG files", "*.png")])
+        if file_path:
+            fig.savefig(file_path)
+            print(f"Graph saved as {file_path}")
 
     def pltPES(self, frame, ngraph, RCoord, Titles, energylist, mechs, Us):
         self.normenlist = []
@@ -174,7 +164,6 @@ class App(customtkinter.CTk):
             print('bartype', self.mechs[ngraph][key].barstyle)
             print('line', self.mechs[ngraph][key].linestyle)
             print('color', self.mechs[ngraph][key].color_name)
-            #print('barstyle :', str(mechs[ngraph][energylist[ngraph][key]].bartype))
         # Normalization:
 
         if hasattr(self.energysets, 'sel_norm') and self.energysets.sel_norm.get() == 'on':
@@ -195,7 +184,6 @@ class App(customtkinter.CTk):
                 convlist = self.conversion(ngraph, self.normenlist, Us, self.energysets.sel_conv)
                 self.convlist = convlist
 
-
         fig, ax = plt.subplots(figsize=(8, 6))
         ax.set_title(Titles[0])
         ax.set_xlabel('Reaction Coordinate')
@@ -205,10 +193,6 @@ class App(customtkinter.CTk):
         for key in self.convlist[ngraph]:
             i = 0
             for i, value in enumerate(self.convlist[ngraph][key]):
-                #plot the horizontal bars
-                #if list(self.mechs[ngraph][key].SPdict.keys())[i] == RCoord[self.ngraph][i]:
-                #    print('The Coord is ', list(self.mechs[ngraph][key].SPdict.keys())[i], ' or ', RCoord[self.ngraph][i])
-                #print('X', self.mechs[ngraph][key].SPdict[RCoord[self.ngraph][i]])
                 if self.mechs[ngraph][key].SPdict[RCoord[self.ngraph][i]] == 'False':
                     ax.hlines(y=value, xmin=reaction_coordinates[i]-0.5, xmax=reaction_coordinates[i]+0.5, color=str(self.mechs[ngraph][key].color_code), linewidth=2, linestyles=self.mechs[ngraph][key].barstyle)
                 elif self.mechs[ngraph][key].SPdict[RCoord[self.ngraph][i]] == 'True':
@@ -232,8 +216,6 @@ class App(customtkinter.CTk):
                         x_values = [reaction_coordinates[i], reaction_coordinates[i+1]]
                         y_values = [self.convlist[ngraph][key][i], self.convlist[ngraph][key][i+1]]
                         ax.plot(x_values, y_values, color=str(self.mechs[ngraph][key].color_code), linewidth=0.5, linestyle=self.mechs[ngraph][key].linestyle)
-                        
-                    #print(self.convlist[ngraph][key][i])
                 i += 1
 
         ax.legend()
@@ -247,13 +229,16 @@ class App(customtkinter.CTk):
         canvas.draw()
         canvas.get_tk_widget().grid(row=0, column=0, sticky="nsew")
 
+        # Add save button
+        save_button = customtkinter.CTkButton(frame, text="Save as PNG", command=lambda: self.save_PES_png(fig))
+        save_button.grid(row=1, column=0, pady=10)  # Place the button below the graph
+
+
         # Set the frame to expand to fit the content
         frame.grid_rowconfigure(0, weight=1)
         frame.grid_columnconfigure(0, weight=1)
 
         plt.close(fig)
-
-
 
 class EnergySettings(customtkinter.CTkFrame):
     def __init__(self, master, ngraph, title, refs, mechs, energylist, Units, RC):
@@ -265,20 +250,13 @@ class EnergySettings(customtkinter.CTkFrame):
         self.ngraph = ngraph
         self.mechs = mechs
         self.RC = RC
-        #self.m = mechs[ngraph]
         self.energylist = energylist
-
         self.refsubbox = None
         self.graphicalsets = None
-        #self.canvGS = None
-        #self.scrollGS = None
         self.SPsettings = None
-
 
         #DEFAULT SELECTIONS
         self.sel_ref = 'no ref'
-
-
 
         self.grid_columnconfigure(0, weight=1)
         self.title = customtkinter.CTkLabel(self, text=f'Energy settings for {self.Title}', font=('Helvetica', 18, 'bold'), fg_color="gray30", corner_radius=6)
@@ -292,7 +270,6 @@ class EnergySettings(customtkinter.CTkFrame):
             print(self.values)
             self.values.append('False')
 
-
         if self.mechs[ngraph] == 0:
             m = {}
             j = 0
@@ -301,7 +278,6 @@ class EnergySettings(customtkinter.CTkFrame):
                 j += 1
         print('jelo', m[self.refs[0]].SPdict)
         self.mechs[self.ngraph] = m
-
 
 # Conversion of units
         self.conv_label = customtkinter.CTkLabel(self, text='Unit conversion:')
@@ -312,7 +288,6 @@ class EnergySettings(customtkinter.CTkFrame):
 # Normalization
         self.sel_norm = tk.StringVar(value='off')
         self.normcheck = customtkinter.CTkCheckBox(self, text='Normalize', variable=self.sel_norm, onvalue='on', offvalue='off', command=lambda: self.createrefsubbox(self.sel_norm, self.refs)) #Comprobar si está pulsado cuando se genere el gráfico
-        #print('self.sel_norm.get()', self.sel_norm.get())
         self.normcheck.grid(row=3, column=0, padx=10, pady=(10, 0), sticky="w")
 # Create Graphical Settings Window
         self.graphsets = customtkinter.CTkButton(self, text="Graphical Settings", command=lambda:self.opengraphsets(self.Title, self.ngraph, self.refs, self.mechs, self.energylist))
@@ -324,23 +299,8 @@ class EnergySettings(customtkinter.CTkFrame):
             # Create Canvas
             self.newWin = customtkinter.CTkToplevel(self, fg_color="black")
             self.newWin.title('Graphical Settings')
-            #self.newWin.resizable()
-            #self.canvGS.grid(row=0, column=0, sticky="nsew", columnspan=1)
-            ## Horizontal Scrollbar
-            #self.scrollGSX = customtkinter.CTkScrollbar(self, orientation='horizontal', command=self.canvGS.xview)
-            #self.scrollGSX.grid(row=1, column=0, sticky='ew')
-            ## Vertical Scrollbar
-            #self.scrollGSY = customtkinter.CTkScrollbar(self, orientation='vertical', command=self.canvGS.yview)
-            #self.scrollGSY.grid(row=0, column=1, sticky='ns')
-#
-            #self.canvGS.configure(xscrollcommand=self.scrollGSX.set)
-            #self.canvGS.configure(yscrollcommand=self.scrollGSY.set)
-
-            #self.graphicalsets.update_idletasks()
             self.graphicalsets = GraphicalSettings(self.newWin, title, ngraph, refs, mechs, energylist, self.RC)
             self.graphicalsets.grid( padx=10, pady=(10, 0))
-            #self.canvGS.create_window((0, 0), window=self.graphicalsets, anchor="nw")
-            #self.canvGS.config(scrollregion=self.canvGS.bbox("all"))
         else:
             if self.graphicalsets:
                 self.graphicalsets.destroy()
@@ -348,10 +308,6 @@ class EnergySettings(customtkinter.CTkFrame):
             if self.newWin:
                 self.newWin.destroy()
                 self.newWin = None
-            #if self.scrollGS:
-            #    self.scrollGS.destroy()
-            #    self.scrollGS = None
-#
 
     def createrefsubbox(self, sel_norm, refs):
         if sel_norm.get() == 'on':
@@ -369,23 +325,16 @@ class RefSubBox(customtkinter.CTkFrame):
         super().__init__(master)
         # Setting Refference
         self.refbox = ['no ref', 'all zero'] + refs
-        #print('REFBOX:', refbox)
         self.reflabel = customtkinter.CTkLabel(self, text='PES reference:')
         self.reflabel.grid(row=1, column=0, padx=10, pady=(10, 0), sticky="w")
-        #Selection
         self.sel_ref = tk.StringVar(self)
         self.sel_ref.set(self.refbox[0])
         self.refcombox = customtkinter.CTkOptionMenu(self, variable=self.sel_ref, values=self.refbox)
         self.refcombox.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="w")
-        #self.debug = customtkinter.CTkButton(self, text='printref', command=lambda:combobox_callback(self.sel_ref.get()))
-        #self.debug.grid(row=0, column=1, padx=10, pady=(10, 0), sticky="w")
-        
-
 
 class GraphicalSettings(customtkinter.CTkFrame):
     def __init__(self, master, title, ngraph, refs, mechs, energylist, RC):
         super().__init__(master)
-        #self.grid_propagate(False)
         self.ngraph = ngraph
         self.RC = RC
         self.title = title
@@ -404,7 +353,6 @@ class GraphicalSettings(customtkinter.CTkFrame):
         self.SPframe = customtkinter.CTkFrame(self)
         self.SPframe.grid(row=3+len(energylist[ngraph]) ,column=0, padx=10, pady=(10, 0), sticky='w')
 
-
         self.SP_vars = {}
         self.title = customtkinter.CTkLabel(self, text=f'Graphical Settings for {self.title}')
         self.title.grid(row=0 ,column=0, padx=10, pady=(10, 0), sticky='we', columnspan=3)
@@ -412,9 +360,12 @@ class GraphicalSettings(customtkinter.CTkFrame):
         for i in range(len(self.subtitles)):
             stit = customtkinter.CTkLabel(self, text=self.subtitles[i])
             stit.grid(row=1 ,column=i, padx=10, pady=(10, 0), sticky='w')
+        
+        #print('len(refs[ngraph])', len(refs[ngraph]))
 
-        for i in range(len(refs[ngraph])):
-            print('refs[ngraph]', refs[ngraph])
+        for i in range(len(self.refs)):
+            print('refs', self.refs)
+            print('i', i)
             self.colordict[self.refs[i]] = 0
             print(self.refs[i])
 
@@ -433,7 +384,6 @@ class GraphicalSettings(customtkinter.CTkFrame):
             self.linedict[key] = line_var
             line_menu =  customtkinter.CTkOptionMenu(self,variable=line_var, values=linestyles)
             line_menu.grid(row = index+2, column = 2, padx=10, pady=5)
-            #mechs[ngraph][key].linetype = line_var.get()
             # Barstyle
             bar_var = tk.StringVar(self)
             bar_var.set(self.m[key].barstyle)
@@ -468,8 +418,6 @@ class GraphicalSettings(customtkinter.CTkFrame):
                     self.SPsubboxes[key].title.destroy()
                     del self.SPsubboxes[key]
 
-
-
     def savesetts(self, ngraph, sel_color, sel_line, sel_bar, mechs, SPdict):
         print(f"Saving settings for ngraph: {ngraph}")
         print('SPsubbox', SPdict )
@@ -483,7 +431,6 @@ class GraphicalSettings(customtkinter.CTkFrame):
                 print('newdic', newdic)
             mechs[ngraph][key].SPdict = newdic
             print(f'Updated {key}: ref = {newdic}')
-
 
         for key in sel_color.keys():
             color_name = sel_color[key].get()
@@ -508,12 +455,6 @@ class GraphicalSettings(customtkinter.CTkFrame):
             else:
                 print(f'Key {key} not found in mechs[{ngraph}]')
 
-
-
-
-        #print(refs[0])
-        #print('Color = ', mechs[ngraph][refs[0][0]].color_name)
-
 class SPsubbox(customtkinter.CTkFrame):
     def __init__(self, ngraph, master, enlist, ref, index, RC):
         super().__init__(master)
@@ -530,8 +471,6 @@ class SPsubbox(customtkinter.CTkFrame):
             ckSP.grid(row = i, column=index, padx=10, pady=(10, 0), sticky='we')
             i += 1
 
-
-
 class Mech:
     def __init__(self, S, color, linestyle, barstyle, SPdict):
         self.SPdict = SPdict
@@ -543,7 +482,6 @@ class Mech:
             self.ref = S
         else:
             raise ValueError(f"Color '{color}' is not in the list of available colors.")
-#        
 # Global parameters:
 
 eVtokcal = 23.060541945329334
@@ -586,11 +524,8 @@ colors_html = {
 # LINEstyleS
 linestyles = ['solid', 'dotted', 'dashed', 'dashdot']
 
-
 root = App()
 customtkinter.set_appearance_mode("dark")
-
-    
 
 # Run the main event loop
 root.mainloop()
