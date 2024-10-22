@@ -50,7 +50,7 @@ class App(customtkinter.CTk):
         self.grid_rowconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=3)
         self.grid_rowconfigure(2, weight=1)
-        self.load_button = customtkinter.CTkButton(self.LeftFrame, text="Load from CSV", command=lambda:self.readinput(self.ngraph, self.energylist, self.refs, self.RCoord, self.Titles, self.mechs))
+        self.load_button = customtkinter.CTkButton(self.LeftFrame, text="Load file", command=lambda:self.readinput(self.ngraph, self.energylist, self.refs, self.RCoord, self.Titles, self.mechs))
         self.plot_button = customtkinter.CTkButton(self.LeftFrame, text="Plot PES", command=lambda:self.pltPES(self.graph_frame, self.ngraph, self.RCoord, self.Titles, self.energylist, self.mechs, self.Units))
         self.load_button.grid(row=0, column=0,  padx=20, pady=20, sticky="w")
         self.plot_button.grid(row=3, column=0,  padx=20, pady=20, sticky="w")
@@ -62,7 +62,9 @@ class App(customtkinter.CTk):
         energydict = {}
         ref = []
 
-        file_path = filedialog.askopenfilename(filetypes=[("CSV files", "*.csv")])
+        file_path = filedialog.askopenfilename(filetypes=[("CSV files", "*.csv"), ("mPES files", "*.mpes")])
+        print('FP', file_path)
+        ma = {}
         if file_path:
             try:
                 with open(file_path, 'r') as file:
@@ -90,8 +92,25 @@ class App(customtkinter.CTk):
                     energylist[ngraph] = energydict
                     self.Units[ngraph] = U.strip()
                     self.RCoord[ngraph] = RC
-                    self.createenergysets(ngraph, Titles[ngraph], refs[ngraph], mechs, energylist, self.Units, self.RCoord)
-
+                    if file_path.endswith('.mpes'):
+                        #mechs[ngraph] = dict.fromkeys((range(nPES)))
+                        
+                        print('READING MECHS')
+                        headers = next(reader)
+                        for i in range(nPES):
+                            print('i', i)
+                            me = next(reader)
+                            print('me', me)
+                            print(me[1].strip())
+                            ma[me[0]] = Mech(color=me[1].strip(), linestyle=me[2].strip(), barstyle=me[3].strip())
+                            print('ma', ma)
+                        mechs[ngraph] = ma
+                        print('ULO')
+                    if not ma:
+                        print("m is empty before calling createenergysets.")
+                        self.createenergysets(ngraph, Titles[ngraph], refs[ngraph], mechs, energylist, self.Units, self.RCoord)
+                    else:
+                        self.createenergysets(ngraph, Titles[ngraph], refs[ngraph], mechs, energylist, self.Units, self.RCoord)
             except StopIteration as e:
                 print(f"Reached the end of the CSV unexpectedly: {e}")
             except ValueError as e:
@@ -104,6 +123,7 @@ class App(customtkinter.CTk):
         print('Refs', refs)
         print('RCoord', RCoord)
         print('Units :', self.Units)
+        print('MECHS', mechs)
 
     def normalize(self, ngraph, energylist, sel_ref):
         nlist = copy.deepcopy(energylist)
@@ -193,14 +213,20 @@ class App(customtkinter.CTk):
         for key in self.convlist[ngraph]:
             i = 0
             for i, value in enumerate(self.convlist[ngraph][key]):
-                if self.mechs[ngraph][key].SPdict[RCoord[self.ngraph][i]] == 'False':
+                if self.mechs[ngraph][key].SPdict == None:
+                    ax.hlines(y=value, xmin=reaction_coordinates[i]-0.5, xmax=reaction_coordinates[i]+0.5, color=str(self.mechs[ngraph][key].color_code), linewidth=2, linestyles=self.mechs[ngraph][key].barstyle)
+                elif self.mechs[ngraph][key].SPdict[RCoord[self.ngraph][i]] == 'False':
                     ax.hlines(y=value, xmin=reaction_coordinates[i]-0.5, xmax=reaction_coordinates[i]+0.5, color=str(self.mechs[ngraph][key].color_code), linewidth=2, linestyles=self.mechs[ngraph][key].barstyle)
                 elif self.mechs[ngraph][key].SPdict[RCoord[self.ngraph][i]] == 'True':
                     ax.plot(reaction_coordinates[i], value, color=str(self.mechs[ngraph][key].color_code), marker='o')
 
                 if i < len(self.convlist[ngraph][key]) - 1:
                     #plot lines connecting horizontal lines
-                    if self.mechs[ngraph][key].SPdict[RCoord[self.ngraph][i]] == 'False' and self.mechs[ngraph][key].SPdict[RCoord[self.ngraph][i+1]] == 'False':
+                    if self.mechs[ngraph][key].SPdict == None and self.mechs[ngraph][key].SPdict == None:
+                        x_values = [reaction_coordinates[i] + 0.5, reaction_coordinates[i+1] - 0.5]
+                        y_values = [self.convlist[ngraph][key][i], self.convlist[ngraph][key][i+1]]
+                        ax.plot(x_values, y_values, color=str(self.mechs[ngraph][key].color_code), linewidth=0.5, linestyle=self.mechs[ngraph][key].linestyle)
+                    elif self.mechs[ngraph][key].SPdict[RCoord[self.ngraph][i]] == 'False' and self.mechs[ngraph][key].SPdict[RCoord[self.ngraph][i+1]] == 'False':
                         x_values = [reaction_coordinates[i] + 0.5, reaction_coordinates[i+1] - 0.5]
                         y_values = [self.convlist[ngraph][key][i], self.convlist[ngraph][key][i+1]]
                         ax.plot(x_values, y_values, color=str(self.mechs[ngraph][key].color_code), linewidth=0.5, linestyle=self.mechs[ngraph][key].linestyle)
@@ -254,7 +280,7 @@ class EnergySettings(customtkinter.CTkFrame):
         self.refsubbox = None
         self.graphicalsets = None
         self.SPsettings = None
-
+        print('HOLA')
         #DEFAULT SELECTIONS
         self.sel_ref = 'no ref'
 
@@ -269,15 +295,15 @@ class EnergySettings(customtkinter.CTkFrame):
             print(i)
             print(self.values)
             self.values.append('False')
-
+        print('TOT')
         if self.mechs[ngraph] == 0:
             m = {}
             j = 0
             for ref in self.refs:
-                m[ref] = Mech('no ref', list(colors_html.keys())[j], 'dashed', 'solid', dict(zip(self.RC[self.ngraph], self.values)))
+                m[ref] = Mech(list(colors_html.keys())[j], 'dashed', 'solid', SPdict=dict(zip(self.RC[self.ngraph], self.values), S='no ref'))
                 j += 1
-        print('jelo', m[self.refs[0]].SPdict)
-        self.mechs[self.ngraph] = m
+            print('jelo', m[self.refs[0]].SPdict)
+            self.mechs[self.ngraph] = m
 
 # Conversion of units
         self.conv_label = customtkinter.CTkLabel(self, text='Unit conversion:')
@@ -292,6 +318,9 @@ class EnergySettings(customtkinter.CTkFrame):
 # Create Graphical Settings Window
         self.graphsets = customtkinter.CTkButton(self, text="Graphical Settings", command=lambda:self.opengraphsets(self.Title, self.ngraph, self.refs, self.mechs, self.energylist))
         self.graphsets.grid(row=3, column=1, padx=10, pady=(10, 0), sticky="w")
+# Save as mpes button
+        self.mpesbut = customtkinter.CTkButton(self, text="Save as .mpes", command=lambda:self.save_as_mpes(self.ngraph ,self.Title, self.units, self.refs, self.RC, self.energylist, self.mechs))
+        self.mpesbut.grid(row=4, column=1, padx=10, pady=(10, 0), sticky="w")
 
     def opengraphsets(self, title, ngraph, refs, mechs, energylist):
         if not self.graphicalsets:
@@ -319,6 +348,43 @@ class EnergySettings(customtkinter.CTkFrame):
             if self.refsubbox:
                 self.refsubbox.destroy()
                 self.refsubbox = None
+
+    def save_as_mpes(self, ngraph, title, units, refs, RC, en, mechs):
+        print('TITLE', title)
+        print('UNTIS', units[ngraph])
+        print('REFS', refs)
+        print('RC', RC[ngraph])
+        print('EN', en[ngraph])
+        print('MECHS', mechs)
+    
+        file_path = filedialog.asksaveasfilename(defaultextension=".mpes", filetypes=[("MPES files", "*.mpes")])
+        if file_path:
+            with open(file_path, 'w') as f:
+                f.write(title + '\n')
+                f.write("Reaction Coordinates:"+ '\n')
+                f.write(units[ngraph])
+                for coor in RC[ngraph]:
+                    f.write(', ' + (coor))
+                f.write('\n')
+                f.write("Energy:" + '\n')
+                f.write(str(len(refs)) + '\n')
+                for key, values in en[ngraph].items():
+                    f.write(key)
+                    for value in values:
+                        f.write(', ' + str(value))
+                    f.write('\n')
+                f.write('Graph info' + '\n')
+                for key, value in mechs[ngraph].items():
+                    f.write(key)
+                    f.write(', ' + value.color_name)
+                    f.write(', ' + value.linestyle)
+                    f.write(', ' + value.barstyle)
+                    f.write('\n')
+
+                    
+
+                
+
     
 class RefSubBox(customtkinter.CTkFrame):
     def __init__(self, master, refs):
@@ -472,8 +538,11 @@ class SPsubbox(customtkinter.CTkFrame):
             i += 1
 
 class Mech:
-    def __init__(self, S, color, linestyle, barstyle, SPdict):
+    def __init__(self, color, linestyle, barstyle, SPdict=None, S=None):
         self.SPdict = SPdict
+        #if SPdict == None:
+        #    self.SPdict = 
+
         if color in colors_html:
             self.color_name = color
             self.color_code = colors_html[color]
