@@ -6,12 +6,15 @@ import csv
 from plotly.graph_objs.layout import YAxis, XAxis, Margin
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.pyplot as plt
+from PIL import Image, ImageTk
 
 
 # Window Params
 W = 1900
 H = 960
 
+# Global Variables
+Etypes = ['Free Energy', 'Relative Free Energy', 'Potential Energy', 'Relative Potential Energy', 'Enthalpy', 'Gibbs Free Energy']
 # DEBUG FUNCTIONS
 def combobox_callback(choice):
         print("combobox dropdown clicked:", choice)
@@ -54,8 +57,19 @@ class App(customtkinter.CTk):
         self.plot_button = customtkinter.CTkButton(self.LeftFrame, text="Plot PES", command=lambda:self.pltPES(self.graph_frame, self.ngraph, self.RCoord, self.Titles, self.energylist, self.mechs, self.Units))
         self.load_button.grid(row=0, column=0,  padx=20, pady=20, sticky="w")
         self.plot_button.grid(row=3, column=0,  padx=20, pady=20, sticky="w")
+        
+        self.bg_image = Image.open("bg.jpg")  # Replace with your image path
+        self.bg_image = self.bg_image.resize((int(W/3), int(H)))  # Resize if needed
+        self.bg_image_tk = ImageTk.PhotoImage(self.bg_image)
         self.graph_frame = customtkinter.CTkFrame(self.RightFrame, width=W/3, height=H, border_color='blue')
         self.graph_frame.grid(row=0, column=1, padx=10, pady=10)
+        self.gp_canvas = customtkinter.CTkCanvas(self.graph_frame, width=W/3, height=H)
+        self.gp_canvas.pack(fill="both", expand=True)
+        self.gp_canvas.create_image(0, 0, anchor="nw", image=self.bg_image_tk)
+
+
+
+
 
     def readinput(self, ngraph, energylist, refs, RCoord, Titles, mechs): # Read info from CSV
         #global energylist, refs, RCoord, Titles
@@ -205,20 +219,21 @@ class App(customtkinter.CTk):
                 self.convlist = convlist
 
         fig, ax = plt.subplots(figsize=(8, 6))
-        ax.set_title(Titles[0])
+        ax.set_title(f'{self.energysets.sel_title.get()}')
         ax.set_xlabel('Reaction Coordinate')
-        ax.set_ylabel(f'Relative Free Energy ({Us[0]})')
+        ax.set_ylabel(f'{self.energysets.sel_Etype.get()} ({self.energysets.sel_conv.get()})')
 
         # Plot the energetic structures:
         for key in self.convlist[ngraph]:
             i = 0
             for i, value in enumerate(self.convlist[ngraph][key]):
+                label = f"{key} ({self.mechs[ngraph][key].color_name}, {self.mechs[ngraph][key].barstyle})"
                 if self.mechs[ngraph][key].SPdict == None:
-                    ax.hlines(y=value, xmin=reaction_coordinates[i]-0.5, xmax=reaction_coordinates[i]+0.5, color=str(self.mechs[ngraph][key].color_code), linewidth=2, linestyles=self.mechs[ngraph][key].barstyle)
+                    ax.hlines(y=value, xmin=reaction_coordinates[i]-0.5, xmax=reaction_coordinates[i]+0.5, color=str(self.mechs[ngraph][key].color_code), linewidth=2, linestyles=self.mechs[ngraph][key].barstyle, label=label)
                 elif self.mechs[ngraph][key].SPdict[RCoord[self.ngraph][i]] == 'False':
-                    ax.hlines(y=value, xmin=reaction_coordinates[i]-0.5, xmax=reaction_coordinates[i]+0.5, color=str(self.mechs[ngraph][key].color_code), linewidth=2, linestyles=self.mechs[ngraph][key].barstyle)
+                    ax.hlines(y=value, xmin=reaction_coordinates[i]-0.5, xmax=reaction_coordinates[i]+0.5, color=str(self.mechs[ngraph][key].color_code), linewidth=2, linestyles=self.mechs[ngraph][key].barstyle, label=label)
                 elif self.mechs[ngraph][key].SPdict[RCoord[self.ngraph][i]] == 'True':
-                    ax.plot(reaction_coordinates[i], value, color=str(self.mechs[ngraph][key].color_code), marker='o')
+                    ax.plot(reaction_coordinates[i], value, color=str(self.mechs[ngraph][key].color_code), marker='o', label=label)
 
                 if i < len(self.convlist[ngraph][key]) - 1:
                     #plot lines connecting horizontal lines
@@ -243,8 +258,9 @@ class App(customtkinter.CTk):
                         y_values = [self.convlist[ngraph][key][i], self.convlist[ngraph][key][i+1]]
                         ax.plot(x_values, y_values, color=str(self.mechs[ngraph][key].color_code), linewidth=0.5, linestyle=self.mechs[ngraph][key].linestyle)
                 i += 1
-
-        ax.legend()
+        handles, labels = ax.get_legend_handles_labels()
+        by_label = dict(zip(labels, handles))
+        ax.legend(by_label.values(), by_label.keys())
 
         # Embed Matplotlib figure into the tkinter frame
         for widget in frame.winfo_children():
@@ -286,7 +302,7 @@ class EnergySettings(customtkinter.CTkFrame):
 
         self.grid_columnconfigure(0, weight=1)
         self.title = customtkinter.CTkLabel(self, text=f'Energy settings for {self.Title}', font=('Helvetica', 18, 'bold'), fg_color="gray30", corner_radius=6)
-        self.title.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="ew")
+        self.title.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="ew", columnspan=30)
 
         #DEFAULT SETTINGS
         self.values = []
@@ -306,11 +322,25 @@ class EnergySettings(customtkinter.CTkFrame):
             self.mechs[self.ngraph] = m
 
 # Conversion of units
-        self.conv_label = customtkinter.CTkLabel(self, text='Unit conversion:')
+        self.conv_label = customtkinter.CTkLabel(self, text='Unit Conversion:')
         self.conv_label.grid(row=1, column=1, padx=10, pady=(10, 0), sticky="w")
         self.sel_conv = tk.StringVar(value=Units[ngraph])
         self.conversion = customtkinter.CTkComboBox(self, values=['eV', 'kcal/mol', 'kJ/mol'], variable=self.sel_conv)
         self.conversion.grid(row=2, column=1, padx=10, pady=(10, 0), sticky="w")
+# Change Title
+        self.title_label = customtkinter.CTkLabel(self, text='Change Title:')
+        self.title_label.grid(row=1, column=3, padx=10, pady=(10, 0), sticky="w")
+        self.sel_title = tk.StringVar(value=title)
+        self.chg_title = customtkinter.CTkEntry(self, placeholder_text=f'{title}', textvariable=self.sel_title)
+        self.chg_title.grid(row=2, column=3, padx=10, pady=(10, 0), sticky="w")
+
+# Energy Type
+        self.Etype = customtkinter.CTkLabel(self, text='Energy Type:')
+        self.Etype.grid(row=1, column=2, padx=10, pady=(10, 0), sticky="w")
+        self.sel_Etype = tk.StringVar(value='Potential Energy')
+        self.conversion = customtkinter.CTkComboBox(self, values=Etypes, variable=self.sel_Etype)
+        self.conversion.grid(row=2, column=2, padx=10, pady=(10, 0), sticky="w")
+
 # Normalization
         self.sel_norm = tk.StringVar(value='off')
         self.normcheck = customtkinter.CTkCheckBox(self, text='Normalize', variable=self.sel_norm, onvalue='on', offvalue='off', command=lambda: self.createrefsubbox(self.sel_norm, self.refs)) #Comprobar si está pulsado cuando se genere el gráfico
@@ -417,7 +447,7 @@ class GraphicalSettings(customtkinter.CTkFrame):
         print('DEFAULTSETTING:', self.mechs[ngraph])
         #CREATE SP grid:
         self.SPframe = customtkinter.CTkFrame(self)
-        self.SPframe.grid(row=3+len(energylist[ngraph]) ,column=0, padx=10, pady=(10, 0), sticky='w')
+        self.SPframe.grid(row=4+len(energylist[ngraph]) ,column=0, padx=10, pady=(10, 0), sticky='w', columnspan=len(self.refs))
 
         self.SP_vars = {}
         self.title = customtkinter.CTkLabel(self, text=f'Graphical Settings for {self.title}')
@@ -462,7 +492,7 @@ class GraphicalSettings(customtkinter.CTkFrame):
             SP_check.grid(row = index+2, column = 4, padx=10, pady=5, sticky='nsew')
 
         self.save_button = customtkinter.CTkButton(self, text='Save Settings', command=lambda:self.savesetts(ngraph, self.colordict, self.linedict, self.bardict, self.mechs, self.SPsubboxes))
-        self.save_button.grid(row = len(refs[ngraph])+2, column = 3, padx=10, pady=5)
+        self.save_button.grid(row = len(refs[ngraph])+3, column = 0, padx=10, pady=5)
         
     def createSPboxes(self, ngraph, sel_SP, enlist, key, index):
             print('enteredSPboxes')
