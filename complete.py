@@ -48,10 +48,10 @@ class App(customtkinter.CTk):
         self.title("m-PES")
         self.geometry('{}x{}'.format(W, H))
         self.grid_columnconfigure(0, weight=1)
-        self.grid_columnconfigure(1, weight=10)
+        self.grid_columnconfigure(1, weight=1)
         self.grid_columnconfigure(2, weight=1)
         self.grid_rowconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=3)
+        self.grid_rowconfigure(1, weight=1)
         self.grid_rowconfigure(2, weight=1)
         self.load_button = customtkinter.CTkButton(self.LeftFrame, text="Load file", command=lambda:self.readinput(self.ngraph, self.energylist, self.refs, self.RCoord, self.Titles, self.mechs))
         self.plot_button = customtkinter.CTkButton(self.LeftFrame, text="Plot PES", command=lambda:self.pltPES(self.graph_frame, self.ngraph, self.RCoord, self.Titles, self.energylist, self.mechs, self.Units))
@@ -329,22 +329,22 @@ class EnergySettings(customtkinter.CTkFrame):
         self.conversion.grid(row=2, column=1, padx=10, pady=(10, 0), sticky="w")
 # Change Title
         self.title_label = customtkinter.CTkLabel(self, text='Change Title:')
-        self.title_label.grid(row=1, column=3, padx=10, pady=(10, 0), sticky="w")
+        self.title_label.grid(row=4, column=2, padx=10, pady=(10, 0), sticky="w")
         self.sel_title = tk.StringVar(value=title)
         self.chg_title = customtkinter.CTkEntry(self, placeholder_text=f'{title}', textvariable=self.sel_title)
-        self.chg_title.grid(row=2, column=3, padx=10, pady=(10, 0), sticky="w")
+        self.chg_title.grid(row=5, column=2, padx=10, pady=(10, 0), sticky="w")
 
 # Energy Type
         self.Etype = customtkinter.CTkLabel(self, text='Energy Type:')
         self.Etype.grid(row=1, column=2, padx=10, pady=(10, 0), sticky="w")
         self.sel_Etype = tk.StringVar(value='Potential Energy')
         self.conversion = customtkinter.CTkComboBox(self, values=Etypes, variable=self.sel_Etype)
-        self.conversion.grid(row=2, column=2, padx=10, pady=(10, 0), sticky="w")
+        self.conversion.grid(row=2, column=2, padx=10, pady=(10, 0), sticky="w", ipadx=5, ipady=5)
 
 # Normalization
         self.sel_norm = tk.StringVar(value='off')
         self.normcheck = customtkinter.CTkCheckBox(self, text='Normalize', variable=self.sel_norm, onvalue='on', offvalue='off', command=lambda: self.createrefsubbox(self.sel_norm, self.refs)) #Comprobar si está pulsado cuando se genere el gráfico
-        self.normcheck.grid(row=3, column=0, padx=10, pady=(10, 0), sticky="w")
+        self.normcheck.grid(row=1, column=0, padx=10, pady=(10, 0), sticky="nsew")
 # Create Graphical Settings Window
         self.graphsets = customtkinter.CTkButton(self, text="Graphical Settings", command=lambda:self.opengraphsets(self.Title, self.ngraph, self.refs, self.mechs, self.energylist))
         self.graphsets.grid(row=3, column=1, padx=10, pady=(10, 0), sticky="w")
@@ -373,7 +373,7 @@ class EnergySettings(customtkinter.CTkFrame):
             if not self.refsubbox:
                 print('Creating RefsSubBox')
                 self.refsubbox = RefSubBox(self, refs)
-                self.refsubbox.grid(row=2, column=0, padx=10, pady=(10, 0), sticky="nsw")
+                self.refsubbox.grid(row=2, column=0, padx=10, pady=(10, 0), sticky="nsew")
         else:
             if self.refsubbox:
                 self.refsubbox.destroy()
@@ -411,10 +411,6 @@ class EnergySettings(customtkinter.CTkFrame):
                     f.write(', ' + value.barstyle)
                     f.write('\n')
 
-                    
-
-                
-
     
 class RefSubBox(customtkinter.CTkFrame):
     def __init__(self, master, refs):
@@ -422,11 +418,11 @@ class RefSubBox(customtkinter.CTkFrame):
         # Setting Refference
         self.refbox = ['no ref', 'all zero'] + refs
         self.reflabel = customtkinter.CTkLabel(self, text='PES reference:')
-        self.reflabel.grid(row=1, column=0, padx=10, pady=(10, 0), sticky="w")
+        self.reflabel.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="nsew")
         self.sel_ref = tk.StringVar(self)
         self.sel_ref.set(self.refbox[0])
         self.refcombox = customtkinter.CTkOptionMenu(self, variable=self.sel_ref, values=self.refbox)
-        self.refcombox.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="w")
+        self.refcombox.grid(row=0, column=1, padx=10, pady=(10, 0), sticky="nsew")
 
 class GraphicalSettings(customtkinter.CTkFrame):
     def __init__(self, master, title, ngraph, refs, mechs, energylist, RC):
