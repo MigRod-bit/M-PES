@@ -40,10 +40,13 @@ class App(customtkinter.CTk):
         self.normenlist = [] #for normalised energies and plotting them
 
         #Frames
-        self.LeftFrame = customtkinter.CTkFrame(self, width=W/3, height=H, border_color='red')
-        self.LeftFrame.grid(row=0, column=0, padx=20, pady=20, sticky="ns")
-        self.RightFrame = customtkinter.CTkFrame(self, width=2*W/3, height=H, border_color='red')
-        self.RightFrame.grid(row=0, column=1, padx=20, pady=20, sticky="ns")
+        self.LeftFrame = customtkinter.CTkFrame(self, width=W/3, height=2*H/3, border_color='red')
+        self.LeftFrame.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
+        self.RightFrame = customtkinter.CTkFrame(self, width=2*W/3, height=2*H/3, border_color='red')
+        self.RightFrame.grid(row=0, column=1, padx=20, pady=20, sticky="nsew")
+        self.TableFrame = customtkinter.CTkFrame(self, width=W, height=H/3)
+        self.TableFrame.grid(row=1, column= 0, padx=20, pady=20, sticky='nsew', columnspan=2)
+
 
         self.title("m-PES")
         self.geometry('{}x{}'.format(W, H))
@@ -54,16 +57,16 @@ class App(customtkinter.CTk):
         self.grid_rowconfigure(1, weight=1)
         self.grid_rowconfigure(2, weight=1)
         self.load_button = customtkinter.CTkButton(self.LeftFrame, text="Load file", command=lambda:self.readinput(self.ngraph, self.energylist, self.refs, self.RCoord, self.Titles, self.mechs))
-        self.plot_button = customtkinter.CTkButton(self.LeftFrame, text="Plot PES", command=lambda:self.pltPES(self.graph_frame, self.ngraph, self.RCoord, self.Titles, self.energylist, self.mechs, self.Units))
+        self.plot_button = customtkinter.CTkButton(self.LeftFrame, text="Plot PES", command=lambda:self.pltPES(self.graph_frame, self.ngraph, self.originalRC, self.Titles, self.originalEL, self.mechs, self.Units))
         self.load_button.grid(row=0, column=0,  padx=20, pady=20, sticky="w")
         self.plot_button.grid(row=3, column=0,  padx=20, pady=20, sticky="w")
         
         self.bg_image = Image.open("bg.jpg")  # Replace with your image path
-        self.bg_image = self.bg_image.resize((int(W/3), int(H)))  # Resize if needed
+        self.bg_image = self.bg_image.resize((int(W/3), int(2*H/3)))  # Resize if needed
         self.bg_image_tk = ImageTk.PhotoImage(self.bg_image)
-        self.graph_frame = customtkinter.CTkFrame(self.RightFrame, width=W/3, height=H, border_color='blue')
+        self.graph_frame = customtkinter.CTkFrame(self.RightFrame, width=W/3, height=2*H/3, border_color='blue')
         self.graph_frame.grid(row=0, column=1, padx=10, pady=10)
-        self.gp_canvas = customtkinter.CTkCanvas(self.graph_frame, width=W/3, height=H)
+        self.gp_canvas = customtkinter.CTkCanvas(self.graph_frame, width=W/3, height=2*H/3)
         self.gp_canvas.pack(fill="both", expand=True)
         self.gp_canvas.create_image(0, 0, anchor="nw", image=self.bg_image_tk)
 
@@ -122,9 +125,9 @@ class App(customtkinter.CTk):
                         print('ULO')
                     if not ma:
                         print("m is empty before calling createenergysets.")
-                        self.createenergysets(ngraph, Titles[ngraph], refs[ngraph], mechs, energylist, self.Units, self.RCoord)
+                        self.createenergysets(ngraph, Titles[ngraph], refs[ngraph], mechs, energylist, self.Units, RCoord)
                     else:
-                        self.createenergysets(ngraph, Titles[ngraph], refs[ngraph], mechs, energylist, self.Units, self.RCoord)
+                        self.createenergysets(ngraph, Titles[ngraph], refs[ngraph], mechs, energylist, self.Units, RCoord)
             except StopIteration as e:
                 print(f"Reached the end of the CSV unexpectedly: {e}")
             except ValueError as e:
@@ -133,9 +136,9 @@ class App(customtkinter.CTk):
                 print(f"Error loading file: {e}")
 
         print('Titles', Titles)
-        print('Energylist', energylist)
+        print('Energylist', self.originalEL)
         print('Refs', refs)
-        print('RCoord', RCoord)
+        print('RCoord', self.originalRC)
         print('Units :', self.Units)
         print('MECHS', mechs)
 
@@ -170,12 +173,89 @@ class App(customtkinter.CTk):
                 nlist[ngraph][key] = [energy*Conv_mat[u1][u2] for energy in nlist[ngraph][key]]
         return nlist
 
+    def createdatatable(self, energylist, RC):
+        #print("ENERGY LIST:", energylist)
+        rows = list(energylist[0].keys())
+        #print('OOOOOOOOOO', self.cols)
+        #print('RCRCRC', RC)
+        TSs = {}
+
+        h_scrollbar = ttk.Scrollbar(self.TableFrame, orient='horizontal')
+        h_scrollbar.grid(row=1, column=0, sticky='ew')
+
+        for i in rows:
+            TSs[i] = (self.calcacten(energylist[0][i]))
+        print('TSSSSS', TSs)
+        
+        cols = RC[0]
+
+        endata = energylist[0]
+
+        if TSs:
+            # Get the length of the largest list
+            largest_list_length = max(len(value) for value in TSs.values())
+            for i in range(int(largest_list_length/2)):
+                head1 = 'Ea dir ' + str(i+1)
+                head2 = 'Ea inv ' + str(i+1)
+                cols.append(head1)
+                cols.append(head2)
+            for i in rows:
+                [endata[i].append(x) for x in TSs[i]]
+        # Round decimal places
+        for ref, values in endata.items():
+            endata[ref] = [round(value, 6) for value in values]
+
+
+        #############################
+        #print('SELF_ENDATA', endata)
+        #print('ENERGYLIST', energylist)
+    
+        treeview = ttk.Treeview(self.TableFrame, columns=(cols), xscrollcommand=h_scrollbar.set)
+        h_scrollbar.config(command=treeview.xview)
+        treeview.heading("#0", text="Mechanism")
+        for i in cols:
+            treeview.heading(i, text=i)
+            treeview.column(i, width=150, anchor='center')
+        for i in rows:
+            treeview.insert(
+                "", 
+                tk.END,
+                text=i, 
+                values=endata[i]
+            )
+
+        treeview.grid(row=0, column=0, sticky="nsew")
+
+    def calcacten(self, energies):
+        TSlist = []
+        loop = len(energies)-2
+        for i in range(1, loop):
+            a = energies[i] - energies[i-1]
+            b = energies[i] - energies[i+1]
+            if (a > 0 ) and (b > 0 ):
+                TSlist.append(a)
+                TSlist.append(b)
+
+
+        print('TSs', TSlist)
+        return TSlist
+
+
     def createenergysets(self, ngraph, title, refs, mechs, energylist, units, RCoord):
         print('hoa')
         self.energysets = EnergySettings(self.LeftFrame, ngraph, title, refs, mechs, energylist, units, RCoord)
         print('hola')
         self.energysets.grid(row=1, column=0, padx=10, pady=(10, 0), sticky="nsw", columnspan=2)
-        #print(ngraph)
+        
+        #self.originalRCA = []
+        #self.originalRCA.extend(RCoord)
+        self.originalRC = copy.deepcopy(RCoord)
+        self.originalEL = copy.deepcopy(energylist)
+        print('ORIGINALELantes', self.originalEL)
+        print('ELantes', energylist)
+        self.createdatatable(energylist, RCoord)
+        print('ELdespues', energylist)
+        print('ORIGINALELdespues', self.originalEL)
 
     def save_PES_png(self, fig):
         """Function to save the current figure as a PNG file."""
@@ -194,7 +274,7 @@ class App(customtkinter.CTk):
             print(key, 'color =', self.mechs[ngraph][key].color_name)
             print(key, 'SP =', self.mechs[ngraph][key].SPdict)
 
-        for key in self.energylist[ngraph]:
+        for key in energylist[ngraph]:
             print('bartype', self.mechs[ngraph][key].barstyle)
             print('line', self.mechs[ngraph][key].linestyle)
             print('color', self.mechs[ngraph][key].color_name)
@@ -212,7 +292,7 @@ class App(customtkinter.CTk):
             print('Actual Units: ', Us[ngraph])
             print('Obj Units:', self.energysets.sel_conv.get())
             if self.normenlist == []:
-                convlist = self.conversion(ngraph, self.energylist, Us, self.energysets.sel_conv)
+                convlist = self.conversion(ngraph, energylist, Us, self.energysets.sel_conv)
                 self.convlist = convlist
             else:
                 convlist = self.conversion(ngraph, self.normenlist, Us, self.energysets.sel_conv)
@@ -276,15 +356,16 @@ class App(customtkinter.CTk):
         save_button.grid(row=1, column=0, pady=10)  # Place the button below the graph
 
 
-        # Set the frame to expand to fit the content
-        frame.grid_rowconfigure(0, weight=1)
-        frame.grid_columnconfigure(0, weight=1)
+        ## Set the frame to expand to fit the content
+        #frame.grid_rowconfigure(0, weight=1)
+        #frame.grid_columnconfigure(0, weight=1)
 
         plt.close(fig)
+        #self.createdatatable(convlist, RCoord)
 
 class EnergySettings(customtkinter.CTkFrame):
     def __init__(self, master, ngraph, title, refs, mechs, energylist, Units, RC):
-        super().__init__(master, width=W/3, height=3*H/4, border_color='green', border_width=4)
+        super().__init__(master, width=W/3, height=3*H/8, border_color='green', border_width=4)
         self.grid_propagate(False)
         self.Title = title
         self.units = Units
