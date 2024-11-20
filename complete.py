@@ -185,7 +185,7 @@ class App(customtkinter.CTk):
 
         for i in rows:
             TSs[i] = (self.calcacten(energylist[0][i]))
-        print('TSSSSS', TSs)
+        #print('TSSSSS', TSs)
         
         cols = RC[0]
 
@@ -209,7 +209,7 @@ class App(customtkinter.CTk):
         #############################
         #print('SELF_ENDATA', endata)
         #print('ENERGYLIST', energylist)
-    
+        #print('COLS', cols)
         treeview = ttk.Treeview(self.TableFrame, columns=(cols), xscrollcommand=h_scrollbar.set)
         h_scrollbar.config(command=treeview.xview)
         treeview.heading("#0", text="Mechanism")
@@ -237,25 +237,30 @@ class App(customtkinter.CTk):
                 TSlist.append(b)
 
 
-        print('TSs', TSlist)
+        #print('TSs', TSlist)
         return TSlist
 
 
     def createenergysets(self, ngraph, title, refs, mechs, energylist, units, RCoord):
+        self.originalRC = copy.deepcopy(RCoord)
+        self.originalEL = copy.deepcopy(energylist)
         print('hoa')
-        self.energysets = EnergySettings(self.LeftFrame, ngraph, title, refs, mechs, energylist, units, RCoord)
+        self.energysets = EnergySettings(self.LeftFrame, ngraph, title, refs, mechs, self.originalEL, units, self.originalRC)
         print('hola')
         self.energysets.grid(row=1, column=0, padx=10, pady=(10, 0), sticky="nsw", columnspan=2)
         
         #self.originalRCA = []
         #self.originalRCA.extend(RCoord)
-        self.originalRC = copy.deepcopy(RCoord)
-        self.originalEL = copy.deepcopy(energylist)
-        print('ORIGINALELantes', self.originalEL)
-        print('ELantes', energylist)
+
+        #print('ORIGINALELantes', self.originalEL)
+        print('ORIGINALRCantes', self.originalRC)
+        #print('ELantes', energylist)
+        print('RCantes', RCoord)
         self.createdatatable(energylist, RCoord)
-        print('ELdespues', energylist)
-        print('ORIGINALELdespues', self.originalEL)
+        #print('ELdespues', energylist)
+        print('RCdespues', RCoord)
+        #print('ORIGINALELdespues', self.originalEL)
+        print('ORIGINALELdespues', self.originalRC)
 
     def save_PES_png(self, fig):
         """Function to save the current figure as a PNG file."""
@@ -267,8 +272,10 @@ class App(customtkinter.CTk):
     def pltPES(self, frame, ngraph, RCoord, Titles, energylist, mechs, Us):
         self.normenlist = []
         self.convlist = []
+        #energylist2 = copy.deepcopy(energylist)
+        RC2 = copy.deepcopy(RCoord)
         self.mechs = mechs
-        reaction_coordinates = [(i+1)*2 for i in range(len(RCoord[0]))]
+        reaction_coordinates = [(i+1)*2 for i in range(len(RC2[0]))]
         for key in mechs[ngraph]:
             print(key, 'line =', self.mechs[ngraph][key].linestyle)
             print(key, 'color =', self.mechs[ngraph][key].color_name)
@@ -284,8 +291,8 @@ class App(customtkinter.CTk):
             if hasattr(self.energysets, 'refsubbox') and hasattr(self.energysets.refsubbox, 'sel_ref'):
                 print('NORM?', self.energysets.sel_norm.get())
                 print('SEL REF', self.energysets.refsubbox.sel_ref.get())
-                normenlist = self.normalize(ngraph, energylist, self.energysets.refsubbox.sel_ref) # Hay que averiguar bien como normalizar esto.
-                self.normenlist = normenlist
+                self.normenlist = self.normalize(ngraph, energylist, self.energysets.refsubbox.sel_ref) # Hay que averiguar bien como normalizar esto.
+                
 
         # Unit Conversion:
         if hasattr(self.energysets, 'sel_conv'):
@@ -310,9 +317,9 @@ class App(customtkinter.CTk):
                 label = f"{key} ({self.mechs[ngraph][key].color_name}, {self.mechs[ngraph][key].barstyle})"
                 if self.mechs[ngraph][key].SPdict == None:
                     ax.hlines(y=value, xmin=reaction_coordinates[i]-0.5, xmax=reaction_coordinates[i]+0.5, color=str(self.mechs[ngraph][key].color_code), linewidth=2, linestyles=self.mechs[ngraph][key].barstyle, label=label)
-                elif self.mechs[ngraph][key].SPdict[RCoord[self.ngraph][i]] == 'False':
+                elif self.mechs[ngraph][key].SPdict[RC2[self.ngraph][i]] == 'False':
                     ax.hlines(y=value, xmin=reaction_coordinates[i]-0.5, xmax=reaction_coordinates[i]+0.5, color=str(self.mechs[ngraph][key].color_code), linewidth=2, linestyles=self.mechs[ngraph][key].barstyle, label=label)
-                elif self.mechs[ngraph][key].SPdict[RCoord[self.ngraph][i]] == 'True':
+                elif self.mechs[ngraph][key].SPdict[RC2[self.ngraph][i]] == 'True':
                     ax.plot(reaction_coordinates[i], value, color=str(self.mechs[ngraph][key].color_code), marker='o', label=label)
 
                 if i < len(self.convlist[ngraph][key]) - 1:
@@ -321,19 +328,19 @@ class App(customtkinter.CTk):
                         x_values = [reaction_coordinates[i] + 0.5, reaction_coordinates[i+1] - 0.5]
                         y_values = [self.convlist[ngraph][key][i], self.convlist[ngraph][key][i+1]]
                         ax.plot(x_values, y_values, color=str(self.mechs[ngraph][key].color_code), linewidth=0.5, linestyle=self.mechs[ngraph][key].linestyle)
-                    elif self.mechs[ngraph][key].SPdict[RCoord[self.ngraph][i]] == 'False' and self.mechs[ngraph][key].SPdict[RCoord[self.ngraph][i+1]] == 'False':
+                    elif self.mechs[ngraph][key].SPdict[RC2[self.ngraph][i]] == 'False' and self.mechs[ngraph][key].SPdict[RC2[self.ngraph][i+1]] == 'False':
                         x_values = [reaction_coordinates[i] + 0.5, reaction_coordinates[i+1] - 0.5]
                         y_values = [self.convlist[ngraph][key][i], self.convlist[ngraph][key][i+1]]
                         ax.plot(x_values, y_values, color=str(self.mechs[ngraph][key].color_code), linewidth=0.5, linestyle=self.mechs[ngraph][key].linestyle)
-                    elif self.mechs[ngraph][key].SPdict[RCoord[self.ngraph][i]] == 'True' and self.mechs[ngraph][key].SPdict[RCoord[self.ngraph][i+1]] == 'False':
+                    elif self.mechs[ngraph][key].SPdict[RC2[self.ngraph][i]] == 'True' and self.mechs[ngraph][key].SPdict[RC2[self.ngraph][i+1]] == 'False':
                         x_values = [reaction_coordinates[i], reaction_coordinates[i+1] - 0.5]
                         y_values = [self.convlist[ngraph][key][i], self.convlist[ngraph][key][i+1]]
                         ax.plot(x_values, y_values, color=str(self.mechs[ngraph][key].color_code), linewidth=0.5, linestyle=self.mechs[ngraph][key].linestyle)
-                    elif self.mechs[ngraph][key].SPdict[RCoord[self.ngraph][i]] == 'False' and self.mechs[ngraph][key].SPdict[RCoord[self.ngraph][i+1]] == 'True':
+                    elif self.mechs[ngraph][key].SPdict[RC2[self.ngraph][i]] == 'False' and self.mechs[ngraph][key].SPdict[RC2[self.ngraph][i+1]] == 'True':
                         x_values = [reaction_coordinates[i] + 0.5, reaction_coordinates[i+1]]
                         y_values = [self.convlist[ngraph][key][i], self.convlist[ngraph][key][i+1]]
                         ax.plot(x_values, y_values, color=str(self.mechs[ngraph][key].color_code), linewidth=0.5, linestyle=self.mechs[ngraph][key].linestyle)
-                    elif self.mechs[ngraph][key].SPdict[RCoord[self.ngraph][i]] == 'True' and self.mechs[ngraph][key].SPdict[RCoord[self.ngraph][i+1]] == 'True':
+                    elif self.mechs[ngraph][key].SPdict[RC2[self.ngraph][i]] == 'True' and self.mechs[ngraph][key].SPdict[RC2[self.ngraph][i+1]] == 'True':
                         x_values = [reaction_coordinates[i], reaction_coordinates[i+1]]
                         y_values = [self.convlist[ngraph][key][i], self.convlist[ngraph][key][i+1]]
                         ax.plot(x_values, y_values, color=str(self.mechs[ngraph][key].color_code), linewidth=0.5, linestyle=self.mechs[ngraph][key].linestyle)
@@ -361,7 +368,7 @@ class App(customtkinter.CTk):
         #frame.grid_columnconfigure(0, weight=1)
 
         plt.close(fig)
-        #self.createdatatable(convlist, RCoord)
+        self.createdatatable(convlist, RC2) # RC2 is needed so that the activation energies don't get inserted as new reaction coordinates.
 
 class EnergySettings(customtkinter.CTkFrame):
     def __init__(self, master, ngraph, title, refs, mechs, energylist, Units, RC):
@@ -427,19 +434,19 @@ class EnergySettings(customtkinter.CTkFrame):
         self.normcheck = customtkinter.CTkCheckBox(self, text='Normalize', variable=self.sel_norm, onvalue='on', offvalue='off', command=lambda: self.createrefsubbox(self.sel_norm, self.refs)) #Comprobar si está pulsado cuando se genere el gráfico
         self.normcheck.grid(row=1, column=0, padx=10, pady=(10, 0), sticky="nsew")
 # Create Graphical Settings Window
-        self.graphsets = customtkinter.CTkButton(self, text="Graphical Settings", command=lambda:self.opengraphsets(self.Title, self.ngraph, self.refs, self.mechs, self.energylist))
+        self.graphsets = customtkinter.CTkButton(self, text="Graphical Settings", command=lambda:self.opengraphsets(self.Title, self.ngraph, self.refs, self.mechs, self.energylist, self.RC))
         self.graphsets.grid(row=3, column=1, padx=10, pady=(10, 0), sticky="w")
 # Save as mpes button
         self.mpesbut = customtkinter.CTkButton(self, text="Save as .mpes", command=lambda:self.save_as_mpes(self.ngraph ,self.Title, self.units, self.refs, self.RC, self.energylist, self.mechs))
         self.mpesbut.grid(row=4, column=1, padx=10, pady=(10, 0), sticky="w")
 
-    def opengraphsets(self, title, ngraph, refs, mechs, energylist):
+    def opengraphsets(self, title, ngraph, refs, mechs, energylist, RC):
         if not self.graphicalsets:
             print('Creating Graphical Settings')
             # Create Canvas
             self.newWin = customtkinter.CTkToplevel(self, fg_color="black")
             self.newWin.title('Graphical Settings')
-            self.graphicalsets = GraphicalSettings(self.newWin, title, ngraph, refs, mechs, energylist, self.RC)
+            self.graphicalsets = GraphicalSettings(self.newWin, title, ngraph, refs, mechs, energylist, RC)
             self.graphicalsets.grid( padx=10, pady=(10, 0))
         else:
             if self.graphicalsets:
@@ -522,6 +529,7 @@ class GraphicalSettings(customtkinter.CTkFrame):
         print('REFS', refs)
         # DEFAULT SETTINGS
         print('DEFAULTSETTING:', self.mechs[ngraph])
+        print('RCin GRAPHSETTS:', RC)
         #CREATE SP grid:
         self.SPframe = customtkinter.CTkFrame(self)
         self.SPframe.grid(row=4+len(energylist[ngraph]) ,column=0, padx=10, pady=(10, 0), sticky='w', columnspan=len(self.refs))
