@@ -7,7 +7,8 @@ from plotly.graph_objs.layout import YAxis, XAxis, Margin
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.pyplot as plt
 from PIL import Image, ImageTk
-
+import numpy as np
+import matplotlib.patheffects as path_effects
 
 # Window Params
 W = 1900
@@ -184,7 +185,7 @@ class App(customtkinter.CTk):
         h_scrollbar.grid(row=1, column=0, sticky='ew')
 
         for i in rows:
-            TSs[i] = (self.calcacten(energylist[0][i]))
+            TSs[i], index = (self.calcacten(energylist[0][i]))
         #print('TSSSSS', TSs)
         
         cols = RC[0]
@@ -228,6 +229,7 @@ class App(customtkinter.CTk):
 
     def calcacten(self, energies):
         TSlist = []
+        TSindex = []
         loop = len(energies)-2
         for i in range(1, loop):
             a = energies[i] - energies[i-1]
@@ -235,10 +237,11 @@ class App(customtkinter.CTk):
             if (a > 0 ) and (b > 0 ):
                 TSlist.append(a)
                 TSlist.append(b)
+                TSindex.append(i+1)
 
 
         #print('TSs', TSlist)
-        return TSlist
+        return TSlist, TSindex
 
 
     def createenergysets(self, ngraph, title, refs, mechs, energylist, units, RCoord):
@@ -345,6 +348,35 @@ class App(customtkinter.CTk):
                         y_values = [self.convlist[ngraph][key][i], self.convlist[ngraph][key][i+1]]
                         ax.plot(x_values, y_values, color=str(self.mechs[ngraph][key].color_code), linewidth=0.5, linestyle=self.mechs[ngraph][key].linestyle)
                 i += 1
+            if hasattr(self.energysets, 'sel_AE') and self.energysets.sel_AE.get() == 'on':
+                #pass
+                # Graph the Act En value:
+                TSen, TSin = self.calcacten(self.convlist[ngraph][key])
+                print('TSEN', TSen)
+                print('TSINDEX', TSin)
+                for l, ind in enumerate(TSin):
+                    if self.mechs[ngraph][key].SPdict[RC2[self.ngraph][ind-1]] == 'False':
+                        # Vertical Line RIGHT:
+                        x_values = [2*ind + 0.5, 2*ind + 0.5]
+                        y_values = [self.convlist[ngraph][key][ind-1], self.convlist[ngraph][key][ind]]
+                        ax.plot(x_values, y_values, color=str(self.mechs[ngraph][key].color_code), linewidth=0.5, linestyle='dotted')
+                        # Vertical Line LEFT:
+                        x_values = [2*ind - 0.5, 2*ind - 0.5]
+                        y_values = [self.convlist[ngraph][key][ind-1], self.convlist[ngraph][key][ind-2]]
+                        ax.plot(x_values, y_values, color=str(self.mechs[ngraph][key].color_code), linewidth=0.5, linestyle='dotted')
+                        # Horizontal Line RIGHT:
+                        x_values = [2*ind + 0.5, 2*(ind+1) - 0.5]
+                        y_values = [self.convlist[ngraph][key][ind], self.convlist[ngraph][key][ind]]
+                        ax.plot(x_values, y_values, color=str(self.mechs[ngraph][key].color_code), linewidth=0.5, linestyle='dotted')
+                        # Horizonatal Line LEFT:
+                        x_values = [2*ind - 0.5, 2*(ind-1) + 0.5]
+                        y_values = [self.convlist[ngraph][key][ind-2], self.convlist[ngraph][key][ind-2]]
+                        ax.plot(x_values, y_values, color=str(self.mechs[ngraph][key].color_code), linewidth=0.5, linestyle='dotted')
+                        #print(self.convlist[ngraph][key][ind-1])
+                        # Print the Activation Energy value in the graph
+                        plt.text(float(ind*2-1.5), np.mean([self.convlist[ngraph][key][ind-1], self.convlist[ngraph][key][ind-2]]), str(round(TSen[2*l],2)), color = str(self.mechs[ngraph][key].color_code), weight='bold').set_path_effects([path_effects.Stroke(linewidth=1, foreground='black'), path_effects.Normal()])
+                        plt.text(float(ind*2+0.5), np.mean([self.convlist[ngraph][key][ind-1], self.convlist[ngraph][key][ind]]), str(round(TSen[2*l+1],2)), color = str(self.mechs[ngraph][key].color_code), weight='bold').set_path_effects([path_effects.Stroke(linewidth=1, foreground='black'), path_effects.Normal()])
+            #plt.text(5, 1, 'HOLA')
         handles, labels = ax.get_legend_handles_labels()
         by_label = dict(zip(labels, handles))
         ax.legend(by_label.values(), by_label.keys())
@@ -439,6 +471,10 @@ class EnergySettings(customtkinter.CTkFrame):
 # Save as mpes button
         self.mpesbut = customtkinter.CTkButton(self, text="Save as .mpes", command=lambda:self.save_as_mpes(self.ngraph ,self.Title, self.units, self.refs, self.RC, self.energylist, self.mechs))
         self.mpesbut.grid(row=4, column=1, padx=10, pady=(10, 0), sticky="w")
+# Show Activation Energy button
+        self.sel_AE = tk.StringVar(value='off')
+        self.AEbox = customtkinter.CTkCheckBox(self, text="Show Activation Energy", variable=self.sel_AE, onvalue='on', offvalue='off')
+        self.AEbox.grid(row=3, column=0, padx=10, pady=(10, 0), sticky="nsew")
 
     def opengraphsets(self, title, ngraph, refs, mechs, energylist, RC):
         if not self.graphicalsets:
