@@ -354,6 +354,7 @@ class App(customtkinter.CTk):
                 TSen, TSin = self.calcacten(self.convlist[ngraph][key])
                 print('TSEN', TSen)
                 print('TSINDEX', TSin)
+                txtcoords = []
                 for l, ind in enumerate(TSin):
                     if self.mechs[ngraph][key].SPdict[RC2[self.ngraph][ind-1]] == 'False':
                         # Vertical Line RIGHT:
@@ -374,8 +375,34 @@ class App(customtkinter.CTk):
                         ax.plot(x_values, y_values, color=str(self.mechs[ngraph][key].color_code), linewidth=0.5, linestyle='dotted')
                         #print(self.convlist[ngraph][key][ind-1])
                         # Print the Activation Energy value in the graph
-                        plt.text(float(ind*2-1.5), np.mean([self.convlist[ngraph][key][ind-1], self.convlist[ngraph][key][ind-2]]), str(round(TSen[2*l],2)), color = str(self.mechs[ngraph][key].color_code), weight='bold').set_path_effects([path_effects.Stroke(linewidth=1, foreground='black'), path_effects.Normal()])
-                        plt.text(float(ind*2+0.5), np.mean([self.convlist[ngraph][key][ind-1], self.convlist[ngraph][key][ind]]), str(round(TSen[2*l+1],2)), color = str(self.mechs[ngraph][key].color_code), weight='bold').set_path_effects([path_effects.Stroke(linewidth=1, foreground='black'), path_effects.Normal()])
+                        txt1 = plt.text(float(ind*2-1.5), np.mean([self.convlist[ngraph][key][ind-1], self.convlist[ngraph][key][ind-2]]), str(round(TSen[2*l],2)), color = str(self.mechs[ngraph][key].color_code), weight='bold')
+                        txt2 = plt.text(float(ind*2+0.5), np.mean([self.convlist[ngraph][key][ind-1], self.convlist[ngraph][key][ind]]), str(round(TSen[2*l+1],2)), color = str(self.mechs[ngraph][key].color_code), weight='bold')
+                        txt1.set_path_effects([path_effects.Stroke(linewidth=1, foreground='black'), path_effects.Normal()])
+                        txt2.set_path_effects([path_effects.Stroke(linewidth=1, foreground='black'), path_effects.Normal()])
+                        txt1_pos = txt1.get_position()
+                        txt2_pos = txt2.get_position()
+                        # If Ea text is overlapping, dispace them in y axis
+                        evdiff = 1.0
+                        for c in txtcoords:
+                            if abs(txt1.get_position()[1] - c[1]) < evdiff and txt1.get_position()[1] - c[1] > 0:
+                                txt1_pos = (txt1_pos[0], txt1_pos[1] + (evdiff-(txt1.get_position()[1] - c[1])))
+                                txt1.set_position(txt1_pos)
+                            elif abs(txt1.get_position()[1] - c[1]) < evdiff and txt1.get_position()[1] - c[1] < 0:
+                                txt1_pos = (txt1_pos[0], txt1_pos[1] - abs(txt1.get_position()[1] - c[1]))
+                                txt1.set_position(txt1_pos)
+
+                            if abs(txt2.get_position()[1] - c[1]) < evdiff and txt2.get_position()[1] - c[1] > 0:
+                                txt2_pos = (txt2_pos[0], txt2_pos[1] + (evdiff-(txt2.get_position()[1] - c[1])))
+                                txt2.set_position(txt2_pos)
+                            elif abs(txt2.get_position()[1] - c[1]) < evdiff and txt2.get_position()[1] - c[1] < 0:
+                                txt2_pos = (txt2_pos[0], txt2_pos[1] - abs(txt2.get_position()[1] - c[1]))
+                                txt2.set_position(txt2_pos)
+
+                        txtcoords.append(txt1.get_position())
+                        txtcoords.append(txt2.get_position())
+
+                        print("DB1", txtcoords)
+
             #plt.text(5, 1, 'HOLA')
         handles, labels = ax.get_legend_handles_labels()
         by_label = dict(zip(labels, handles))
