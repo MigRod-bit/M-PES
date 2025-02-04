@@ -90,10 +90,32 @@ class App(customtkinter.CTk):
                     T = next(reader)[0]
                     print('TITLE = ', T)
                     headers = next(reader)  
-                    line = next(reader)  # Read gas reaction coords
-                    for i in range(len(line)):
-                        RC = [coord for coord in line[1:]]
-                    U = line[0]
+                    print(headers)
+                    if headers[0] == 'Multiple Reaction Coordinates:':
+                        print(headers[0])
+                        RC = []
+                        line = next(reader)
+                        numbRC = int(line[1])
+                        print(numbRC)
+                        U = line[0]
+                        print(U)
+                        for i in range(numbRC):
+                            line = next(reader)
+                            for j in range(len(line)):
+                                coords = [coord for coord in line]
+                            RC.append(coords)
+                        print('RC', RC)
+                        maxList = max(RC, key = len)
+                        print('MAXLIST', maxList)
+                        RCoord[ngraph] = maxList
+                        self.RCoord[ngraph] = maxList
+                    else:
+                        line = next(reader)  # Read gas reaction coords
+                        for i in range(len(line)):
+                            RC = [coord for coord in line[1:]]
+                        U = line[0]
+                        RCoord[ngraph] = RC
+                        self.RCoord[ngraph] = RC
                     headers = next(reader) 
                     nPES = next(reader)  # Number of PES diagrams
                     nPES = int(nPES[0])
@@ -106,10 +128,10 @@ class App(customtkinter.CTk):
                         print(i)
                     refs[ngraph] = ref
                     Titles[ngraph] = T
-                    RCoord[ngraph] = RC
+                    
                     energylist[ngraph] = energydict
                     self.Units[ngraph] = U.strip()
-                    self.RCoord[ngraph] = RC
+                    
                     if file_path.endswith('.mpes'):
                         #mechs[ngraph] = dict.fromkeys((range(nPES)))
                         
