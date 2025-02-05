@@ -378,10 +378,6 @@ class App(customtkinter.CTk):
                             for n in first_k_coor.tolist():
                                 reaction_coordinates[RC_index].append(n)
 
-
-                        print('first_k_coor', first_k_coor)
-
-
                     else:
                         print('index_k_RC_dict', index_k_RC_dict)
                         k_coor = np.linspace(longcoor[0], longcoor[-1], len(k_RC))
@@ -435,24 +431,17 @@ class App(customtkinter.CTk):
         for key in self.convlist[ngraph]:
             i = 0
             for i, value in enumerate(self.convlist[ngraph][key]):   
-                #COMPROBACION
-                #print('key', key)
-                #print('i', i)
-                #print('self.mechs', self.mechs)
-                #print('enumerate(self.convlist[ngraph][key])', self.convlist[ngraph][key])
-                #print('self.mechs[ngraph][key].SPdict[RC2[self.ngraph][i+1]]', self.mechs[ngraph][key].SPdict[RC2[self.ngraph][i+1]])
-                #print('COMPROBACION', self.mechs[ngraph][key].SPdict[RC2[self.ngraph][i+1]])
 
                 label = f"{key} ({self.mechs[ngraph][key].color_name}, {self.mechs[ngraph][key].barstyle})"
                 if self.mechs[ngraph][key].SPdict == None:
-                    ax.hlines(y=value, xmin=reaction_coordinates[connection_ref_to_RC[key]][i]-0.5, xmax=reaction_coordinates[connection_ref_to_RC[key]][i]+0.5, color=str(self.mechs[ngraph][key].color_code), linewidth=2, linestyles=self.mechs[ngraph][key].barstyle, label=label)
+                    ax.hlines(y=value, xmin=reaction_coordinates[connection_ref_to_RC[key]][i]-0.5, xmax=reaction_coordinates[connection_ref_to_RC[key]][i]+0.5, color=str(self.mechs[ngraph][key].color_code), linewidth=4, linestyles=self.mechs[ngraph][key].barstyle, label=label)
                 elif self.mechs[ngraph][key].SPdict[RC2[self.ngraph][connection_ref_to_RC[key]][i]] == 'False':
-                    ax.hlines(y=value, xmin=reaction_coordinates[connection_ref_to_RC[key]][i]-0.5, xmax=reaction_coordinates[connection_ref_to_RC[key]][i]+0.5, color=str(self.mechs[ngraph][key].color_code), linewidth=2, linestyles=self.mechs[ngraph][key].barstyle, label=label)
+                    ax.hlines(y=value, xmin=reaction_coordinates[connection_ref_to_RC[key]][i]-0.5, xmax=reaction_coordinates[connection_ref_to_RC[key]][i]+0.5, color=str(self.mechs[ngraph][key].color_code), linewidth=4, linestyles=self.mechs[ngraph][key].barstyle, label=label)
                 elif self.mechs[ngraph][key].SPdict[RC2[self.ngraph][connection_ref_to_RC[key]][i]] == 'True':
                     ax.plot(reaction_coordinates[connection_ref_to_RC[key]][i], value, color=str(self.mechs[ngraph][key].color_code), marker='o', label=label)
 
                 if i < len(self.convlist[ngraph][key]) - 1:
-                      # Aquí se plotean las barras correspondientes a las estructuras 
+                      # Aquí se plotean las lineas que unen las estructuras 
                     if self.mechs[ngraph][key].SPdict == None and self.mechs[ngraph][key].SPdict == None:
                         x_values = [reaction_coordinates[connection_ref_to_RC[key]][i] + 0.5, reaction_coordinates[connection_ref_to_RC[key]][i+1] - 0.5]
                         y_values = [self.convlist[ngraph][key][i], self.convlist[ngraph][key][i+1]]
