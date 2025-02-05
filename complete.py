@@ -77,6 +77,7 @@ class App(customtkinter.CTk):
 
     def readinput(self, ngraph, energylist, refs, RCoord, Titles, mechs): # Read info from CSV
         #global energylist, refs, RCoord, Titles
+        global connection_ref_to_RC
         energydict = {}
         ref = []
 
@@ -107,8 +108,10 @@ class App(customtkinter.CTk):
                         print('RC', RC)
                         maxList = max(RC, key = len)
                         print('MAXLIST', maxList)
-                        RCoord[ngraph] = maxList
-                        self.RCoord[ngraph] = maxList
+                        #RCoord[ngraph] = maxList
+                        RCoord[ngraph] = RC
+                        #self.RCoord[ngraph] = maxList
+                        self.RCoord[ngraph] = RC
                     else:
                         line = next(reader)  # Read gas reaction coords
                         for i in range(len(line)):
@@ -116,16 +119,31 @@ class App(customtkinter.CTk):
                         U = line[0]
                         RCoord[ngraph] = RC
                         self.RCoord[ngraph] = RC
-                    headers = next(reader) 
+                    headersa = next(reader) 
                     nPES = next(reader)  # Number of PES diagrams
                     nPES = int(nPES[0])
                     print(nPES)
-                    for i in range(nPES):
+                    connection_ref_to_RC = {}  # A dict which matches the RC to the corresponding ref.
+                    x = 0 # COUNTER FOR THE LOOP WHICH ADDS RC to refs.
+                    for i in range(nPES):                      
                         energy = next(reader)
                         fenergy = [float(num) for num in energy[1:]]
                         energydict[energy[0]] = fenergy
                         ref.append(energy[0])
-                        print(i)
+                        if headers[0] == 'Multiple Reaction Coordinates:':
+                            if len(fenergy) == len(RC[x]):
+                                connection_ref_to_RC[energy[0]] = x
+                            else:
+                                while x < numbRC:
+                                    print('X', x, numbRC)
+                                    if len(fenergy) == len(RC[x]):
+                                        connection_ref_to_RC[energy[0]] = x
+                                        break
+                                    x += 1
+                            print("CONNECTON", connection_ref_to_RC)
+                            print(i)
+                        else:
+                            connection_ref_to_RC[energy[0]] = 0
                     refs[ngraph] = ref
                     Titles[ngraph] = T
                     
@@ -158,11 +176,11 @@ class App(customtkinter.CTk):
             except Exception as e:
                 print(f"Error loading file: {e}")
 
-        print('Titles', Titles)
+        #print('Titles', Titles)
         print('Energylist', self.originalEL)
-        print('Refs', refs)
+        #print('Refs', refs)
         print('RCoord', self.originalRC)
-        print('Units :', self.Units)
+        #print('Units :', self.Units)
         print('MECHS', mechs)
 
     def normalize(self, ngraph, energylist, sel_ref):
@@ -299,8 +317,84 @@ class App(customtkinter.CTk):
         self.convlist = []
         #energylist2 = copy.deepcopy(energylist)
         RC2 = copy.deepcopy(RCoord)
+        print('RC2 when plotting', RC2)
         self.mechs = mechs
-        reaction_coordinates = [(i+1)*2 for i in range(len(RC2[0]))]
+        if isinstance(RC2[0][0], list):
+            long_RC = [max(RC2[0], key=len), 0]
+            long_RC = long_RC[0]
+            print('long', long_RC)
+            long_index = next(i for i,v in enumerate(RC2[0]) if long_RC == v)
+            print('long_index', long_index)
+
+        #else:
+        #    print("You only have one reaction coordinate?")
+        #    long_RC = RC2[0]
+        reaction_coordinates=[]
+        print('self.refs', self.refs)
+
+        if isinstance(RC2[0][0], list):
+            longcoor = ([(i+1)*2 for i in range(len(long_RC))])
+            reaction_coordinates = [None] * len(self.refs[ngraph])
+            print('INTIAL REACTION COORDINATES', reaction_coordinates)
+            #reaction_coordinates[long_index] = longcoor
+            print('INTIAL REACTION COORDINATES long', reaction_coordinates)
+            for k in self.refs[ngraph]:
+                if connection_ref_to_RC[k] == long_index:
+                    reaction_coordinates[long_index] = longcoor
+                else:
+                    k_RC = RC2[0][connection_ref_to_RC[k]]  # ESTOS SON LOS NOMBRES DE LAS COORDENADAS 
+                    index_k_RC_dict = {}
+                    for v in k_RC:
+                        if v in long_RC[1:-1]:
+                            val_index = long_RC.index(v)
+                            index_k_RC_dict[v] = val_index
+
+                    if bool(index_k_RC_dict) == True:     # THIS BLOCK MAKES THE GRAPH PLOT THE HORIZONTAL LINES AT THE SAME COORDINATES.
+                        last_Coor = list(index_k_RC_dict.keys())[-1]
+                        RC_index = next(i for i,v in enumerate(RC2[0]) if k_RC == v)
+                        for ke in index_k_RC_dict.keys():
+                            print('KE', ke)
+                            if list(index_k_RC_dict.keys()).index(ke) == 0:
+                                print('ENTERED IF OF FIRST INDEX')
+                                first_k_coor = np.linspace(longcoor[0], longcoor[index_k_RC_dict[ke]], k_RC.index(ke)+1)
+                                reaction_coordinates[RC_index] = first_k_coor.tolist()
+                            else:
+                               print('ENTERED IF OF INTERMEDIATE INDEX')
+                               first_k_coor = np.linspace(reaction_coordinates[RC_index][-1], longcoor[index_k_RC_dict[ke]], k_RC.index(ke) +1 - k_RC.index(prev_ke))
+                               first_k_coor = first_k_coor[1:]
+                               for n in first_k_coor.tolist():
+                                    reaction_coordinates[RC_index].append(n)
+                            if len(list(index_k_RC_dict.keys())) == 1:
+                                print('ENTERED LAST IF WHEN THERE IS ONLY ONE INDEX')
+                                first_k_coor = np.linspace(longcoor[index_k_RC_dict[ke]], longcoor[-1], k_RC.index(k_RC[-1]) - k_RC.index(ke)+1)
+                                first_k_coor = first_k_coor[1:]
+                                for n in first_k_coor.tolist():
+                                    reaction_coordinates[RC_index].append(n)
+                            prev_ke = ke    
+                        if len(reaction_coordinates[RC_index]) < len(k_RC):
+                            print('ENTERED LAST IF ')
+                            first_k_coor = np.linspace(longcoor[index_k_RC_dict[ke]], longcoor[-1], k_RC.index(k_RC[-1]) - k_RC.index(ke)+1)
+                            first_k_coor = first_k_coor[1:]
+                            for n in first_k_coor.tolist():
+                                reaction_coordinates[RC_index].append(n)
+
+
+                        print('first_k_coor', first_k_coor)
+
+
+                    else:
+                        print('index_k_RC_dict', index_k_RC_dict)
+                        k_coor = np.linspace(longcoor[0], longcoor[-1], len(k_RC))
+                        RC_index = next(i for i,v in enumerate(RC2[0]) if k_RC == v)
+                        reaction_coordinates[RC_index] = k_coor
+                    print('index_k_RC_dict', index_k_RC_dict)
+        else:
+            for i in range(len(RC2[ngraph])):
+                k = self.refs[ngraph][i]
+                coo = ([(i+1)*2 for i in range(len(RC2[self.ngraph][connection_ref_to_RC[k]]))])
+                print('coo', coo)
+                reaction_coordinates.append(coo)
+        print('REACTION COORDINATES', reaction_coordinates)
         for key in mechs[ngraph]:
             print(key, 'line =', self.mechs[ngraph][key].linestyle)
             print(key, 'color =', self.mechs[ngraph][key].color_name)
@@ -336,37 +430,47 @@ class App(customtkinter.CTk):
         ax.set_ylabel(f'{self.energysets.sel_Etype.get()} ({self.energysets.sel_conv.get()})')
 
         # Plot the energetic structures:
+        
+        
         for key in self.convlist[ngraph]:
             i = 0
-            for i, value in enumerate(self.convlist[ngraph][key]):
+            for i, value in enumerate(self.convlist[ngraph][key]):   
+                #COMPROBACION
+                #print('key', key)
+                #print('i', i)
+                #print('self.mechs', self.mechs)
+                #print('enumerate(self.convlist[ngraph][key])', self.convlist[ngraph][key])
+                #print('self.mechs[ngraph][key].SPdict[RC2[self.ngraph][i+1]]', self.mechs[ngraph][key].SPdict[RC2[self.ngraph][i+1]])
+                #print('COMPROBACION', self.mechs[ngraph][key].SPdict[RC2[self.ngraph][i+1]])
+
                 label = f"{key} ({self.mechs[ngraph][key].color_name}, {self.mechs[ngraph][key].barstyle})"
                 if self.mechs[ngraph][key].SPdict == None:
-                    ax.hlines(y=value, xmin=reaction_coordinates[i]-0.5, xmax=reaction_coordinates[i]+0.5, color=str(self.mechs[ngraph][key].color_code), linewidth=2, linestyles=self.mechs[ngraph][key].barstyle, label=label)
-                elif self.mechs[ngraph][key].SPdict[RC2[self.ngraph][i]] == 'False':
-                    ax.hlines(y=value, xmin=reaction_coordinates[i]-0.5, xmax=reaction_coordinates[i]+0.5, color=str(self.mechs[ngraph][key].color_code), linewidth=2, linestyles=self.mechs[ngraph][key].barstyle, label=label)
-                elif self.mechs[ngraph][key].SPdict[RC2[self.ngraph][i]] == 'True':
-                    ax.plot(reaction_coordinates[i], value, color=str(self.mechs[ngraph][key].color_code), marker='o', label=label)
+                    ax.hlines(y=value, xmin=reaction_coordinates[connection_ref_to_RC[key]][i]-0.5, xmax=reaction_coordinates[connection_ref_to_RC[key]][i]+0.5, color=str(self.mechs[ngraph][key].color_code), linewidth=2, linestyles=self.mechs[ngraph][key].barstyle, label=label)
+                elif self.mechs[ngraph][key].SPdict[RC2[self.ngraph][connection_ref_to_RC[key]][i]] == 'False':
+                    ax.hlines(y=value, xmin=reaction_coordinates[connection_ref_to_RC[key]][i]-0.5, xmax=reaction_coordinates[connection_ref_to_RC[key]][i]+0.5, color=str(self.mechs[ngraph][key].color_code), linewidth=2, linestyles=self.mechs[ngraph][key].barstyle, label=label)
+                elif self.mechs[ngraph][key].SPdict[RC2[self.ngraph][connection_ref_to_RC[key]][i]] == 'True':
+                    ax.plot(reaction_coordinates[connection_ref_to_RC[key]][i], value, color=str(self.mechs[ngraph][key].color_code), marker='o', label=label)
 
                 if i < len(self.convlist[ngraph][key]) - 1:
-                    #plot lines connecting horizontal lines
+                      # Aquí se plotean las barras correspondientes a las estructuras 
                     if self.mechs[ngraph][key].SPdict == None and self.mechs[ngraph][key].SPdict == None:
-                        x_values = [reaction_coordinates[i] + 0.5, reaction_coordinates[i+1] - 0.5]
+                        x_values = [reaction_coordinates[connection_ref_to_RC[key]][i] + 0.5, reaction_coordinates[connection_ref_to_RC[key]][i+1] - 0.5]
                         y_values = [self.convlist[ngraph][key][i], self.convlist[ngraph][key][i+1]]
                         ax.plot(x_values, y_values, color=str(self.mechs[ngraph][key].color_code), linewidth=0.5, linestyle=self.mechs[ngraph][key].linestyle)
-                    elif self.mechs[ngraph][key].SPdict[RC2[self.ngraph][i]] == 'False' and self.mechs[ngraph][key].SPdict[RC2[self.ngraph][i+1]] == 'False':
-                        x_values = [reaction_coordinates[i] + 0.5, reaction_coordinates[i+1] - 0.5]
+                    elif self.mechs[ngraph][key].SPdict[RC2[self.ngraph][connection_ref_to_RC[key]][i]] == 'False' and self.mechs[ngraph][key].SPdict[RC2[self.ngraph][connection_ref_to_RC[key]][i+1]] == 'False':
+                        x_values = [reaction_coordinates[connection_ref_to_RC[key]][i] + 0.5, reaction_coordinates[connection_ref_to_RC[key]][i+1] - 0.5]
                         y_values = [self.convlist[ngraph][key][i], self.convlist[ngraph][key][i+1]]
                         ax.plot(x_values, y_values, color=str(self.mechs[ngraph][key].color_code), linewidth=0.5, linestyle=self.mechs[ngraph][key].linestyle)
-                    elif self.mechs[ngraph][key].SPdict[RC2[self.ngraph][i]] == 'True' and self.mechs[ngraph][key].SPdict[RC2[self.ngraph][i+1]] == 'False':
-                        x_values = [reaction_coordinates[i], reaction_coordinates[i+1] - 0.5]
+                    elif self.mechs[ngraph][key].SPdict[RC2[self.ngraph][connection_ref_to_RC[key]][i]] == 'True' and self.mechs[ngraph][key].SPdict[RC2[self.ngraph][connection_ref_to_RC[key]][i+1]] == 'False':
+                        x_values = [reaction_coordinates[connection_ref_to_RC[key]][i], reaction_coordinates[connection_ref_to_RC[key]][i+1] - 0.5]
                         y_values = [self.convlist[ngraph][key][i], self.convlist[ngraph][key][i+1]]
                         ax.plot(x_values, y_values, color=str(self.mechs[ngraph][key].color_code), linewidth=0.5, linestyle=self.mechs[ngraph][key].linestyle)
-                    elif self.mechs[ngraph][key].SPdict[RC2[self.ngraph][i]] == 'False' and self.mechs[ngraph][key].SPdict[RC2[self.ngraph][i+1]] == 'True':
-                        x_values = [reaction_coordinates[i] + 0.5, reaction_coordinates[i+1]]
+                    elif self.mechs[ngraph][key].SPdict[RC2[self.ngraph][connection_ref_to_RC[key]][i]] == 'False' and self.mechs[ngraph][key].SPdict[RC2[self.ngraph][connection_ref_to_RC[key]][i+1]] == 'True':
+                        x_values = [reaction_coordinates[connection_ref_to_RC[key]][i] + 0.5, reaction_coordinates[connection_ref_to_RC[key]][i+1]]
                         y_values = [self.convlist[ngraph][key][i], self.convlist[ngraph][key][i+1]]
                         ax.plot(x_values, y_values, color=str(self.mechs[ngraph][key].color_code), linewidth=0.5, linestyle=self.mechs[ngraph][key].linestyle)
-                    elif self.mechs[ngraph][key].SPdict[RC2[self.ngraph][i]] == 'True' and self.mechs[ngraph][key].SPdict[RC2[self.ngraph][i+1]] == 'True':
-                        x_values = [reaction_coordinates[i], reaction_coordinates[i+1]]
+                    elif self.mechs[ngraph][key].SPdict[RC2[self.ngraph][connection_ref_to_RC[key]][i]] == 'True' and self.mechs[ngraph][key].SPdict[RC2[self.ngraph][connection_ref_to_RC[key]][i+1]] == 'True':
+                        x_values = [reaction_coordinates[connection_ref_to_RC[key]][i], reaction_coordinates[connection_ref_to_RC[key]][i+1]]
                         y_values = [self.convlist[ngraph][key][i], self.convlist[ngraph][key][i+1]]
                         ax.plot(x_values, y_values, color=str(self.mechs[ngraph][key].color_code), linewidth=0.5, linestyle=self.mechs[ngraph][key].linestyle)
                 i += 1
@@ -378,7 +482,7 @@ class App(customtkinter.CTk):
                 print('TSINDEX', TSin)
                 txtcoords = []
                 for l, ind in enumerate(TSin):
-                    if self.mechs[ngraph][key].SPdict[RC2[self.ngraph][ind-1]] == 'False':
+                    if self.mechs[ngraph][key].SPdict[RC2[self.ngraph][connection_ref_to_RC[key]][ind-1]] == 'False':
                         # Vertical Line RIGHT:
                         x_values = [2*ind + 0.5, 2*ind + 0.5]
                         y_values = [self.convlist[ngraph][key][ind-1], self.convlist[ngraph][key][ind]]
@@ -451,7 +555,7 @@ class App(customtkinter.CTk):
         plt.close(fig)
         self.createdatatable(convlist, RC2) # RC2 is needed so that the activation energies don't get inserted as new reaction coordinates.
 
-class EnergySettings(customtkinter.CTkFrame):
+class EnergySettings(customtkinter.CTkFrame):    # Cada mech debería tener su energysettings
     def __init__(self, master, ngraph, title, refs, mechs, energylist, Units, RC):
         super().__init__(master, width=W/3, height=3*H/8, border_color='green', border_width=4)
         self.grid_propagate(False)
@@ -476,16 +580,37 @@ class EnergySettings(customtkinter.CTkFrame):
         #DEFAULT SETTINGS
         self.values = []
         print(self.refs)
-        for i in range(len(self.RC[self.ngraph])):
-            print(i)
-            print(self.values)
-            self.values.append('False')
-        print('TOT')
+        print('self.RC', self.RC)
+        # Ahora cada ref tendrá un distinto RC. Se asigna los values de False para S pero no recuerdo que hace .
+        if isinstance(RC[0][0], list):
+            for r in self.refs:
+                print('R', r)
+                val = []
+                for i in range(len(self.RC[self.ngraph][connection_ref_to_RC[r]])):   # Aquí self.RC es una lista que contiene los RC en [0]. Los RC son otra lista.
+                    print('I', i)
+                    print(self.values)
+                    val.append('False')
+                self.values.append(val) # Different number of 'False's depending on the length of the RC.
+        else:
+            for i in range(len(self.RC[self.ngraph])):
+                print('self.RC[self.ngraph]', self.RC[self.ngraph])
+                self.values.append('False')
+                print('self.values', self.values)
+                ############### AQUI ME HE QUEDADO
+        print('TOT', self.mechs[ngraph])
+        print('connect', connection_ref_to_RC)
+        print(self.values[connection_ref_to_RC[self.refs[0]]])
         if self.mechs[ngraph] == 0:
             m = {}
             j = 0
             for ref in self.refs:
-                m[ref] = Mech(list(colors_html.keys())[j], 'dashed', 'solid', SPdict=dict(zip(self.RC[self.ngraph], self.values), S='no ref'))
+                print('REF', ref)
+                print('self.values[connection_ref_to_RC[ref]]', self.values[connection_ref_to_RC[ref]])
+                print('self.values', self.values)
+                if isinstance(RC[0][0], list):
+                    m[ref] = Mech(list(colors_html.keys())[j], 'dashed', 'solid', SPdict=dict(zip(self.RC[self.ngraph][connection_ref_to_RC[ref]], self.values[connection_ref_to_RC[ref]])), S='no ref')
+                else:
+                    m[ref] = Mech(list(colors_html.keys())[j], 'dashed', 'solid', SPdict=dict(zip(self.RC[self.ngraph], self.values)), S='no ref')  
                 j += 1
             print('jelo', m[self.refs[0]].SPdict)
             self.mechs[self.ngraph] = m
@@ -692,7 +817,7 @@ class GraphicalSettings(customtkinter.CTkFrame):
             #for c in SPdict[key]:
             if len(self.SPsubboxes[key].RCspdict.keys()) != len(self.RC[self.ngraph]):
                 print(f'Length of SPdict ({len(self.SPsubboxes[key].RCspdict.keys())}) doesnt match length of RCoord ({len(self.RC[self.ngraph])})')
-            for c in self.RC[self.ngraph]:
+            for c in self.RC[self.ngraph][connection_ref_to_RC[key]]:
                 newdic[c] = SPdict[key].RCspdict[c].get()
                 print('newdic', newdic)
             mechs[ngraph][key].SPdict = newdic
@@ -725,13 +850,14 @@ class SPsubbox(customtkinter.CTkFrame):
     def __init__(self, ngraph, master, enlist, ref, index, RC):
         super().__init__(master)
         self.RC = RC
-        self.ref = ref
+        self.ref = ref #key Example: 8rMECH
         self.RCspdict = {}
         self.title = customtkinter.CTkLabel(master, text=f'SP Settings for {self.ref}')
         self.title.grid(row=0, column=index, padx=10, pady=(10, 0), sticky='we')
         # Create checkboxes for SP
         i = 0
-        for c in RC[ngraph]:
+        print('RC[ngraph]', RC[ngraph])
+        for c in RC[ngraph][connection_ref_to_RC[ref]]:
             self.RCspdict[c] = tk.StringVar(value='False')
             ckSP = customtkinter.CTkCheckBox(self, text=c,variable=self.RCspdict[c], onvalue='True', offvalue='False')
             ckSP.grid(row = i, column=index, padx=10, pady=(10, 0), sticky='we')
