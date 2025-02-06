@@ -100,11 +100,15 @@ class App(customtkinter.CTk):
                         print(numbRC)
                         U = line[0]
                         print(U)
+                        assoc_RC_to_mech = [None] * numbRC
                         for i in range(numbRC):
                             line = next(reader)
-                            for j in range(len(line)):
-                                coords = [coord for coord in line]
+                            assoc_RC_to_mech[i] = line[0]
+                            read_coord = line[1:]
+                            for j in range(len(read_coord)):
+                                coords = [coord for coord in read_coord]
                             RC.append(coords)
+                        print('CHECKING', assoc_RC_to_mech)
                         print('RC', RC)
                         maxList = max(RC, key = len)
                         print('MAXLIST', maxList)
@@ -122,28 +126,22 @@ class App(customtkinter.CTk):
                     headersa = next(reader) 
                     nPES = next(reader)  # Number of PES diagrams
                     nPES = int(nPES[0])
-                    print(nPES)
+                    #print(nPES)
                     connection_ref_to_RC = {}  # A dict which matches the RC to the corresponding ref.
                     x = 0 # COUNTER FOR THE LOOP WHICH ADDS RC to refs.
-                    for i in range(nPES):                      
+                    for i in range(nPES):                      # AQUI DEBERIA IGUAL HACER MATCH AL RC CON EL REF SEGUN EL ORDEN O PONIENDO UN NOMBRE ANTES. NO SE.
                         energy = next(reader)
                         fenergy = [float(num) for num in energy[1:]]
                         energydict[energy[0]] = fenergy
                         ref.append(energy[0])
                         if headers[0] == 'Multiple Reaction Coordinates:':
-                            if len(fenergy) == len(RC[x]):
-                                connection_ref_to_RC[energy[0]] = x
-                            else:
-                                while x < numbRC:
-                                    print('X', x, numbRC)
-                                    if len(fenergy) == len(RC[x]):
-                                        connection_ref_to_RC[energy[0]] = x
-                                        break
-                                    x += 1
+                            connection_ref_to_RC[energy[0]] = int(assoc_RC_to_mech[x])
                             print("CONNECTON", connection_ref_to_RC)
-                            print(i)
+                            #print(i)
                         else:
+                            print('ERROR ASSOCIATING R-COORDS TO REFERENCES')
                             connection_ref_to_RC[energy[0]] = 0
+                        x += 1
                     refs[ngraph] = ref
                     Titles[ngraph] = T
                     
