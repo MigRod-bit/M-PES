@@ -422,6 +422,15 @@ class App(customtkinter.CTk):
         ax.set_title(f'{self.energysets.sel_title.get()}')
         ax.set_xlabel('Reaction Coordinate')
         ax.set_ylabel(f'{self.energysets.sel_Etype.get()} ({self.energysets.sel_conv.get()})')
+        ymin = self.energysets.sel_Enmin.get()
+        ymax = self.energysets.sel_Enmax.get()
+        #check units:
+        if Units_list.index(Us[ngraph]) == Units_list.index(self.energysets.sel_conv.get()):
+            pass
+        else:
+            ymin = ymin * Conv_mat[Units_list.index(Us[ngraph])][Units_list.index(self.energysets.sel_conv.get())]
+            ymax = ymax * Conv_mat[Units_list.index(Us[ngraph])][Units_list.index(self.energysets.sel_conv.get())]
+        ax.set_ylim(ymin, ymax)
 
         # Plot the energetic structures:
         
@@ -556,7 +565,8 @@ class EnergySettings(customtkinter.CTkFrame):    # Cada mech debería tener su e
         self.refsubbox = None
         self.graphicalsets = None
         self.SPsettings = None
-        print('HOLA')
+       #print('HOLA')
+       #print('HOLAAAAAAA', self.energylist)
         #DEFAULT SELECTIONS
         self.sel_ref = 'no ref'
 
@@ -621,7 +631,25 @@ class EnergySettings(customtkinter.CTkFrame):    # Cada mech debería tener su e
         self.sel_Etype = tk.StringVar(value='Potential Energy')
         self.conversion = customtkinter.CTkComboBox(self, values=Etypes, variable=self.sel_Etype)
         self.conversion.grid(row=2, column=2, padx=10, pady=(10, 0), sticky="w", ipadx=5, ipady=5)
-
+# Max-Min Energy
+        self.En_label = customtkinter.CTkLabel(self, text='Set Energy limits:')
+        self.En_label.grid(row=6, column=1, padx=10, pady=(10, 0), sticky="w")
+        #print("SELF.ENERGYLIST", self.energylist)
+        #print("SELF.ENERGYLIST_TYPE", type(self.energylist[0]))
+        for key, values in self.energylist[0].items():
+            print(f"{key}: {type(values)}")
+        max_value = max(val for values in self.energylist[0].values() for val in values)
+        #print('MAX', max_value)
+        min_value = min(val for values in self.energylist[0].values() for val in values)
+        #print('MIN', min_value)
+        max_value = max_value + (max_value - min_value)/3
+        min_value = min_value - (max_value - min_value)/3
+        self.sel_Enmax = tk.DoubleVar(value=max_value)
+        self.sel_Enmin = tk.DoubleVar(value=min_value)
+        self.Enmax = customtkinter.CTkEntry(self, placeholder_text="Max Energy", textvariable=self.sel_Enmax)
+        self.Enmax.grid(row=7, column=1, padx=10, pady=(10, 0), sticky="w")
+        self.Enmin = customtkinter.CTkEntry(self, placeholder_text="Min Energy", textvariable=self.sel_Enmin)
+        self.Enmin.grid(row=7, column=2, padx=10, pady=(10, 0), sticky="w")
 # Normalization
         self.sel_norm = tk.StringVar(value='off')
         self.normcheck = customtkinter.CTkCheckBox(self, text='Normalize', variable=self.sel_norm, onvalue='on', offvalue='off', command=lambda: self.createrefsubbox(self.sel_norm, self.refs)) #Comprobar si está pulsado cuando se genere el gráfico
