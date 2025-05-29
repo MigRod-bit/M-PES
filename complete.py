@@ -329,6 +329,8 @@ class App(customtkinter.CTk):
         #    long_RC = RC2[0]
         reaction_coordinates=[]
         print('self.refs', self.refs)
+        # UPDATE FONTSIZE
+        plt.rcParams.update({'font.size': self.energysets.Fontsize.get()})
 
         if isinstance(RC2[0][0], list):
             longcoor = ([(i+1)*2 for i in range(len(long_RC))])
@@ -418,7 +420,7 @@ class App(customtkinter.CTk):
                 convlist = self.conversion(ngraph, self.normenlist, Us, self.energysets.sel_conv)
                 self.convlist = convlist
 
-        fig, ax = plt.subplots(figsize=(8, 6))
+        fig, ax = plt.subplots(figsize=(8, 6), constrained_layout=True)
         ax.set_title(f'{self.energysets.sel_title.get()}')
         ax.set_xlabel('Reaction Coordinate')
         ax.set_ylabel(f'{self.energysets.sel_Etype.get()} ({self.energysets.sel_conv.get()})')
@@ -528,7 +530,9 @@ class App(customtkinter.CTk):
             #plt.text(5, 1, 'HOLA')
         handles, labels = ax.get_legend_handles_labels()
         by_label = dict(zip(labels, handles))
-        ax.legend(by_label.values(), by_label.keys())
+        if self.energysets.sel_rem_legend.get() == 'off':
+            ax.legend(by_label.values(), by_label.keys())
+
 
         # Embed Matplotlib figure into the tkinter frame
         for widget in frame.winfo_children():
@@ -636,8 +640,8 @@ class EnergySettings(customtkinter.CTkFrame):    # Cada mech debería tener su e
         self.En_label.grid(row=6, column=1, padx=10, pady=(10, 0), sticky="w")
         #print("SELF.ENERGYLIST", self.energylist)
         #print("SELF.ENERGYLIST_TYPE", type(self.energylist[0]))
-        for key, values in self.energylist[0].items():
-            print(f"{key}: {type(values)}")
+        #for key, values in self.energylist[0].items():
+        #    print(f"{key}: {type(values)}")
         max_value = max(val for values in self.energylist[0].values() for val in values)
         #print('MAX', max_value)
         min_value = min(val for values in self.energylist[0].values() for val in values)
@@ -650,6 +654,18 @@ class EnergySettings(customtkinter.CTkFrame):    # Cada mech debería tener su e
         self.Enmax.grid(row=7, column=1, padx=10, pady=(10, 0), sticky="w")
         self.Enmin = customtkinter.CTkEntry(self, placeholder_text="Min Energy", textvariable=self.sel_Enmin)
         self.Enmin.grid(row=7, column=2, padx=10, pady=(10, 0), sticky="w")
+# Font Size button
+        self.Fontsize_label = customtkinter.CTkLabel(self, text='Set Font Size')
+        self.Fontsize_label.grid(row=6, column=0, padx=10, pady=(10, 0), sticky="w")  
+        #default fs
+        fs = 10
+        self.Fontsize = tk.IntVar(value=fs)    
+        self.FSentry = customtkinter.CTkEntry(self, placeholder_text="Font Size", textvariable=self.Fontsize) 
+        self.FSentry.grid(row=7, column=0, padx=10, pady=(10, 0), sticky="w")
+# Set Legend
+        self.sel_rem_legend = tk.StringVar(value='off')
+        self.rem_legend = customtkinter.CTkCheckBox(self, text='Remove Legend', variable=self.sel_rem_legend, onvalue='on', offvalue='off')
+        self.rem_legend.grid(row=4, column=0, padx=10, pady=(10, 0), sticky="nsew")
 # Normalization
         self.sel_norm = tk.StringVar(value='off')
         self.normcheck = customtkinter.CTkCheckBox(self, text='Normalize', variable=self.sel_norm, onvalue='on', offvalue='off', command=lambda: self.createrefsubbox(self.sel_norm, self.refs)) #Comprobar si está pulsado cuando se genere el gráfico
